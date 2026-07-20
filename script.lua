@@ -92,10 +92,21 @@ local function SetStatus(t) StatusL.Text = t end
 -- HTTP HELPER
 -- =============================================================================
 local function safeGet(url)
-    if request       then return request({Url=url,Method="GET"}).Body end
-    if http_request  then return http_request({Url=url,Method="GET"}).Body end
-    if syn and syn.request then return syn.request({Url=url,Method="GET"}).Body end
-    return game:HttpGet(url)
+    if type(request) == "function" then
+        local success, res = pcall(request, {Url=url,Method="GET"})
+        if success and type(res) == "table" and res.Body then return res.Body end
+    end
+    if type(http_request) == "function" then
+        local success, res = pcall(http_request, {Url=url,Method="GET"})
+        if success and type(res) == "table" and res.Body then return res.Body end
+    end
+    if syn and type(syn.request) == "function" then
+        local success, res = pcall(syn.request, {Url=url,Method="GET"})
+        if success and type(res) == "table" and res.Body then return res.Body end
+    end
+    local success, res = pcall(game.HttpGet, game, url)
+    if success then return res end
+    return nil
 end
 
 -- =============================================================================
@@ -103,16 +114,27 @@ end
 -- =============================================================================
 SetStatus("Loading Orion..."); SetProgress(12, 0.2); task.wait(0.2)
 
-local OrionLib
-local ok = pcall(function()
-    OrionLib = loadstring(safeGet("https://raw.githubusercontent.com/jensonhirst/Orion/main/source"))()
-end)
-if not ok or type(OrionLib) ~= "table" then
+local function safeLoadLibrary(url)
+    local body = safeGet(url)
+    if not body or body == "" or body:find("<!DOCTYPE") or body:find("404") or body:find("rate limit") then
+        return nil
+    end
+    local compileSuccess, func = pcall(loadstring, body)
+    if not compileSuccess or type(func) ~= "function" then
+        return nil
+    end
+    local runSuccess, lib = pcall(func)
+    if not runSuccess then
+        return nil
+    end
+    return lib
+end
+
+local OrionLib = safeLoadLibrary("https://raw.githubusercontent.com/jensonhirst/Orion/main/source")
+if type(OrionLib) ~= "table" then
     SetStatus("Trying fallback..."); SetProgress(28, 0.2); task.wait(0.4)
-    local ok2 = pcall(function()
-        OrionLib = loadstring(safeGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
-    end)
-    if not ok2 or type(OrionLib) ~= "table" then
+    OrionLib = safeLoadLibrary("https://raw.githubusercontent.com/shlexware/Orion/main/source")
+    if type(OrionLib) ~= "table" then
         SetStatus("FAILED - check connection"); SetProgress(100,0.3); task.wait(3); LoadGui:Destroy(); return
     end
 end
@@ -128,7 +150,10 @@ local Games = {
 }
 local DetectedGame = nil
 for name, ids in pairs(Games) do
-    if table.find(ids, PlaceId) then DetectedGame = name; break end
+    for _, id in ipairs(ids) do
+        if id == PlaceId then DetectedGame = name; break end
+    end
+    if DetectedGame then break end
 end
 local Universal = not DetectedGame
 if Universal then DetectedGame = "Unknown" end
