@@ -120,8 +120,9 @@ end
 function Watchdog.SafeFireRemote(name, ...)
     local event = ReplicatedStorage:FindFirstChild(name, true)
     if event then
+        local args = {...}
         local success, err = pcall(function()
-            event:FireServer(...)
+            event:FireServer(unpack(args))
         end)
         return success
     end
@@ -304,6 +305,38 @@ local function GetHRP()
     return c:FindFirstChild("HumanoidRootPart")
 end
 
+local function HasActiveQuest()
+    local main = LP:FindFirstChild("PlayerGui") and LP.PlayerGui:FindFirstChild("Main")
+    local quest = main and main:FindFirstChild("Quest")
+    if quest and quest.Visible then
+        return true
+    end
+    return false
+end
+
+local function FindQuestNPC(npcCF, range)
+    local targetNpc = nil
+    local minDist = range or 120
+    pcall(function()
+        local searchFolders = {WS, WS:FindFirstChild("NPCs")}
+        for _, folder in ipairs(searchFolders) do
+            if folder then
+                for _, npc in ipairs(folder:GetChildren()) do
+                    local rp = npc:FindFirstChild("HumanoidRootPart") or npc.PrimaryPart
+                    if rp then
+                        local dist = (rp.Position - npcCF.Position).Magnitude
+                        if dist < minDist then
+                            minDist = dist
+                            targetNpc = npc
+                        end
+                    end
+                end
+            end
+        end
+    end)
+    return targetNpc
+end
+
 -- "Human-Like" Anti-Cheat Safe Path Teleporter (Using speed limits & small step lerps)
 local function SafeTP(cf, instant)
     pcall(function()
@@ -382,13 +415,20 @@ local function AttackNearest(hrp, range)
         local parts = WS:GetPartBoundsInRadius(hrp.Position, range, op)
         for _, part in ipairs(parts) do
             local char = part.Parent
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            local r_hrp = char and char:FindFirstChild("HumanoidRootPart")
-            if hum and hum.Health > 0 and r_hrp and not Players:GetPlayerFromCharacter(char) and r_hrp.Position.Y < 8000 then
-                local dist = (hrp.Position - r_hrp.Position).Magnitude
-                if dist < nearestDist then
-                    nearestDist = dist
-                    nearest = r_hrp
+            local mob = char
+            if mob and mob:IsA("Model") then
+                if mob.PrimaryPart and mob.PrimaryPart.Position.Y > 50000 then
+                    -- Skip this mob immediately, no print/warn allowed.
+                else
+                    local hum = mob:FindFirstChildOfClass("Humanoid")
+                    local r_hrp = mob:FindFirstChild("HumanoidRootPart")
+                    if hum and hum.Health > 0 and r_hrp and not Players:GetPlayerFromCharacter(mob) and r_hrp.Position.Y < 8000 then
+                        local dist = (hrp.Position - r_hrp.Position).Magnitude
+                        if dist < nearestDist then
+                            nearestDist = dist
+                            nearest = r_hrp
+                        end
+                    end
                 end
             end
         end
@@ -1135,18 +1175,25 @@ if DetectedGame == "Blox Fruits" then
             local parts = WS:GetPartBoundsInRadius(myHrp.Position, 220, op)
             for _, part in ipairs(parts) do
                 local char = part.Parent
-                local hum = char and char:FindFirstChild("Humanoid")
-                local r_hrp = char and char:FindFirstChild("HumanoidRootPart")
-                if hum and hum.Health > 0 and r_hrp and r_hrp.Position.Y <= 50000 and not Players:GetPlayerFromCharacter(char) then
-                    local isMob = false
-                    for _, kw in ipairs(keywords) do
-                        if char.Name:lower():find(kw:lower()) then isMob = true; break end
-                    end
-                    if isMob then
-                        r_hrp.CanCollide = false
-                        r_hrp.CFrame = CFrame.new(targetPos) * CFrame.new(0, -3.2, -1)
-                        r_hrp.Velocity = Vector3.zero
-                        hum.PlatformStand = true
+                local mob = char
+                if mob and mob:IsA("Model") then
+                    if mob.PrimaryPart and mob.PrimaryPart.Position.Y > 50000 then
+                        -- Skip this mob immediately, no print/warn allowed.
+                    else
+                        local hum = mob:FindFirstChild("Humanoid")
+                        local r_hrp = mob:FindFirstChild("HumanoidRootPart")
+                        if hum and hum.Health > 0 and r_hrp and r_hrp.Position.Y <= 50000 and not Players:GetPlayerFromCharacter(mob) then
+                            local isMob = false
+                            for _, kw in ipairs(keywords) do
+                                if mob.Name:lower():find(kw:lower()) then isMob = true; break end
+                            end
+                            if isMob then
+                                r_hrp.CanCollide = false
+                                r_hrp.CFrame = CFrame.new(targetPos) * CFrame.new(0, -3.2, -1)
+                                r_hrp.Velocity = Vector3.zero
+                                hum.PlatformStand = true
+                            end
+                        end
                     end
                 end
             end
