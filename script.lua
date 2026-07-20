@@ -64,6 +64,73 @@ local function TrackConnection(connection)
 end
 
 -- =============================================================================
+-- WATCHDOG SHIELD & ERROR HANDLER (SELF-CONTAINED)
+-- =============================================================================
+local Watchdog = {
+    DebugMode = true,
+    AlertColor = "🔴 [WATCHDOG ALERT]",
+    WarningColor = "⚠️ [WATCHDOG WARNING]"
+}
+
+local function watchdogLog(prefix, msg)
+    if Watchdog.DebugMode then
+        print(string.format("%s [%s] %s", prefix, os.date("%H:%M:%S"), tostring(msg)))
+    end
+end
+
+local function errorHandler(err)
+    local stackTrace = debug.traceback()
+    local detailedError = string.format(
+        "\n==================================================\n" ..
+        "%s CRITICAL RUNTIME EXCEPTION DETECTED!\n" ..
+        "Error: %s\n" ..
+        "--------------------------------------------------\n" ..
+        "STACK TRACE:\n%s\n" ..
+        "==================================================",
+        Watchdog.AlertColor,
+        tostring(err),
+        stackTrace
+    )
+    warn(detailedError)
+    return err
+end
+
+function Watchdog.SafeExecute(func, ...)
+    local args = {...}
+    local success, err = xpcall(function()
+        return func(unpack(args))
+    end, errorHandler)
+    return success, err
+end
+
+function Watchdog.SafeGet(parent, childName, timeout)
+    if not parent then return nil end
+    local child = parent:FindFirstChild(childName)
+    if not child and timeout and timeout > 0 then
+        pcall(function()
+            child = parent:WaitForChild(childName, timeout)
+        end)
+    end
+    if not child then
+        warn(string.format("%s MISSING OBJECT: %s inside %s!", Watchdog.WarningColor, tostring(childName), tostring(parent)))
+    end
+    return child
+end
+
+function Watchdog.SafeFireRemote(name, ...)
+    local event = ReplicatedStorage:FindFirstChild(name, true)
+    if event then
+        local success, err = pcall(function()
+            event:FireServer(...)
+        end)
+        return success
+    end
+    warn(string.format("%s MISSING REMOTE: %s konnte nicht gefunden werden!", Watchdog.WarningColor, tostring(name)))
+    return false
+end
+
+
+-- =============================================================================
 -- LOADING SCREEN (Modern High-Contrast Dark Theme)
 -- =============================================================================
 local LoadGui = Instance.new("ScreenGui")
