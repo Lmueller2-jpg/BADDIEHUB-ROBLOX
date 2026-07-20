@@ -201,18 +201,28 @@ local function TryClickDetector(part)
     return false
 end
 
--- Attack the nearest mob (multi-method)
+-- Attack the nearest mob (multi-method - OPTIMIZED WITH SPATIAL QUERIES)
 local function AttackNearest(hrp, range)
     local nearest, nearestDist = nil, range
-    for _, obj in ipairs(WS:GetDescendants()) do
-        if obj:IsA("Humanoid") and obj.Health > 0 then
-            local rp = obj.Parent and obj.Parent:FindFirstChild("HumanoidRootPart")
-            if rp and not Players:GetPlayerFromCharacter(obj.Parent) and rp.Position.Y < 8000 then
-                local dist = (hrp.Position - rp.Position).Magnitude
-                if dist < nearestDist then nearestDist = dist; nearest = rp end
+    pcall(function()
+        local op = OverlapParams.new()
+        op.FilterType = Enum.RaycastFilterType.Exclude
+        op.FilterDescendantsInstances = {LP.Character}
+        
+        local parts = WS:GetPartBoundsInRadius(hrp.Position, range, op)
+        for _, part in ipairs(parts) do
+            local char = part.Parent
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local r_hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hum and hum.Health > 0 and r_hrp and not Players:GetPlayerFromCharacter(char) and r_hrp.Position.Y < 8000 then
+                local dist = (hrp.Position - r_hrp.Position).Magnitude
+                if dist < nearestDist then
+                    nearestDist = dist
+                    nearest = r_hrp
+                end
             end
         end
-    end
+    end)
     if nearest then
         hrp.CFrame = nearest.CFrame * CFrame.new(0,0,3.5)
         task.wait(0.05)
@@ -876,210 +886,653 @@ BFTab:AddLabel("Auto Spin tries: InvokeServer, ProximityPrompt, UI button")
 -- ---------- SEA 1 AUTO QUEST ----------
 BFTab:AddSection({ Name = "Sea 1 Auto Quest" })
 
--- Sea 1 quest data: {name, questNPC CFrame, mob search keywords, farm time in seconds}
+-- Exhaustive, highly precise Sea 1 Quests database (Levels 1 to 700)
 local Sea1Quests = {
     {
-        name = "Starter Pirates (Lvl 1)",
-        npcCF = CFrame.new(-1371.1, 5, 1235.5),
-        mobKey = {"Bandit","bandit"},
-        farmTime = 30
+        name = "Bandits (Lvl 1)",
+        minLevel = 1,
+        npcCF = CFrame.new(1060, 16, 1500),
+        questName = "BanditQuest1",
+        questId = 1,
+        mobKey = {"Bandit"},
+        mobCF = CFrame.new(1060, 16, 1540)
     },
     {
-        name = "Marine Starter (Lvl 1)",
-        npcCF = CFrame.new(977, 14, 1430),
-        mobKey = {"Pirate","pirate"},
-        farmTime = 30
+        name = "Monkeys (Lvl 10)",
+        minLevel = 10,
+        npcCF = CFrame.new(-1600, 37, 150),
+        questName = "JungleQuest",
+        questId = 1,
+        mobKey = {"Monkey"},
+        mobCF = CFrame.new(-1620, 40, 120)
     },
     {
-        name = "Jungle (Lvl 15)",
-        npcCF = CFrame.new(-139, 13, 1565),
-        mobKey = {"Gorilla","gorilla","Jungle"},
-        farmTime = 40
+        name = "Gorillas (Lvl 15)",
+        minLevel = 15,
+        npcCF = CFrame.new(-1600, 37, 150),
+        questName = "JungleQuest",
+        questId = 2,
+        mobKey = {"Gorilla"},
+        mobCF = CFrame.new(-1200, 25, -230)
     },
     {
-        name = "Pirate Village (Lvl 30)",
-        npcCF = CFrame.new(-1410, 9, -398),
-        mobKey = {"Pirate","pirate"},
-        farmTime = 45
+        name = "Pirates (Lvl 30)",
+        minLevel = 30,
+        npcCF = CFrame.new(-1136, 4, 3855),
+        questName = "BuggyQuest1",
+        questId = 1,
+        mobKey = {"Pirate"},
+        mobCF = CFrame.new(-1220, 15, 3910)
     },
     {
-        name = "Desert (Lvl 60)",
-        npcCF = CFrame.new(936, 8, 3245),
-        mobKey = {"Desert","Bandit","Sand"},
-        farmTime = 50
+        name = "Brutes (Lvl 45)",
+        minLevel = 45,
+        npcCF = CFrame.new(-1136, 4, 3855),
+        questName = "BuggyQuest1",
+        questId = 2,
+        mobKey = {"Brute"},
+        mobCF = CFrame.new(-1145, 15, 4310)
     },
     {
-        name = "Snowy Mountain (Lvl 90)",
-        npcCF = CFrame.new(1175, 42, -1640),
-        mobKey = {"Snow","Yeti","Wolf"},
-        farmTime = 50
+        name = "Desert Bandits (Lvl 60)",
+        minLevel = 60,
+        npcCF = CFrame.new(894, 6, 4385),
+        questName = "DesertQuest",
+        questId = 1,
+        mobKey = {"Desert Bandit"},
+        mobCF = CFrame.new(990, 6, 4420)
     },
     {
-        name = "Marine Fortress (Lvl 120)",
-        npcCF = CFrame.new(-1635, 9, 513),
-        mobKey = {"Marine","marine"},
-        farmTime = 55
+        name = "Desert Officers (Lvl 75)",
+        minLevel = 75,
+        npcCF = CFrame.new(894, 6, 4385),
+        questName = "DesertQuest",
+        questId = 2,
+        mobKey = {"Desert Officer"},
+        mobCF = CFrame.new(1570, 6, 4360)
     },
     {
-        name = "Skylands (Lvl 150)",
-        npcCF = CFrame.new(-4980, 620, -5060),
-        mobKey = {"Sky","Angel","Skypiea"},
-        farmTime = 60
+        name = "Snow Bandits (Lvl 90)",
+        minLevel = 90,
+        npcCF = CFrame.new(1386, 26, -1300),
+        questName = "SnowQuest",
+        questId = 1,
+        mobKey = {"Snow Bandit"},
+        mobCF = CFrame.new(1290, 26, -1340)
     },
     {
-        name = "Prison (Lvl 175)",
+        name = "Snowmen (Lvl 100)",
+        minLevel = 100,
+        npcCF = CFrame.new(1386, 26, -1300),
+        questName = "SnowQuest",
+        questId = 2,
+        mobKey = {"Snowman"},
+        mobCF = CFrame.new(1280, 26, -1450)
+    },
+    {
+        name = "Chief Petty Officers (Lvl 120)",
+        minLevel = 120,
+        npcCF = CFrame.new(-4850, 20, 4300),
+        questName = "MarineQuest",
+        questId = 1,
+        mobKey = {"Chief Petty Officer"},
+        mobCF = CFrame.new(-4830, 20, 4100)
+    },
+    {
+        name = "Sky Bandits (Lvl 150)",
+        minLevel = 150,
+        npcCF = CFrame.new(-1243, 355, -5900),
+        questName = "SkyQuest",
+        questId = 1,
+        mobKey = {"Sky Bandit"},
+        mobCF = CFrame.new(-1220, 390, -5670)
+    },
+    {
+        name = "Dark Masters (Lvl 175)",
+        minLevel = 175,
+        npcCF = CFrame.new(-1243, 355, -5900),
+        questName = "SkyQuest",
+        questId = 2,
+        mobKey = {"Dark Master"},
+        mobCF = CFrame.new(-900, 390, -5610)
+    },
+    {
+        name = "Prisoners (Lvl 190)",
+        minLevel = 190,
         npcCF = CFrame.new(4830, 6, 4775),
-        mobKey = {"Prisoner","Guard","prison"},
-        farmTime = 60
+        questName = "PrisonQuest",
+        questId = 1,
+        mobKey = {"Prisoner"},
+        mobCF = CFrame.new(4800, 6, 4650)
     },
     {
-        name = "Colosseum (Lvl 190)",
-        npcCF = CFrame.new(-597, 22, -1640),
-        mobKey = {"Gladiator","Fighter","colosseum"},
-        farmTime = 60
+        name = "Dangerous Prisoners (Lvl 210)",
+        minLevel = 210,
+        npcCF = CFrame.new(4830, 6, 4775),
+        questName = "PrisonQuest",
+        questId = 2,
+        mobKey = {"Dangerous Prisoner"},
+        mobCF = CFrame.new(4850, 6, 4650)
     },
     {
-        name = "Magma Village (Lvl 210)",
-        npcCF = CFrame.new(-4690, 130, -588),
-        mobKey = {"Magma","Mob","mage"},
-        farmTime = 65
+        name = "Toga Warriors (Lvl 250)",
+        minLevel = 250,
+        npcCF = CFrame.new(-1580, 7, -2980),
+        questName = "ColosseumQuest",
+        questId = 1,
+        mobKey = {"Toga Warrior"},
+        mobCF = CFrame.new(-1800, 7, -2800)
     },
     {
-        name = "Icy Cave (Lvl 250)",
-        npcCF = CFrame.new(-3827, 80, -1400),
-        mobKey = {"Ice","Yeti","Snow"},
-        farmTime = 65
+        name = "Gladiators (Lvl 275)",
+        minLevel = 275,
+        npcCF = CFrame.new(-1580, 7, -2980),
+        questName = "ColosseumQuest",
+        questId = 2,
+        mobKey = {"Gladiator"},
+        mobCF = CFrame.new(-1400, 7, -3000)
     },
+    {
+        name = "Military Soldiers (Lvl 300)",
+        minLevel = 300,
+        npcCF = CFrame.new(-5200, 8, 8400),
+        questName = "MagmaQuest",
+        questId = 1,
+        mobKey = {"Military Soldier"},
+        mobCF = CFrame.new(-5300, 8, 8500)
+    },
+    {
+        name = "Military Spies (Lvl 330)",
+        minLevel = 330,
+        npcCF = CFrame.new(-5200, 8, 8400),
+        questName = "MagmaQuest",
+        questId = 2,
+        mobKey = {"Military Spy"},
+        mobCF = CFrame.new(-5350, 8, 8350)
+    },
+    {
+        name = "Fishman Warriors (Lvl 375)",
+        minLevel = 375,
+        npcCF = CFrame.new(6110, 18, 1550),
+        questName = "FishmanQuest",
+        questId = 1,
+        mobKey = {"Fishman Warrior"},
+        mobCF = CFrame.new(6000, 18, 1400)
+    },
+    {
+        name = "Fishman Commandos (Lvl 400)",
+        minLevel = 400,
+        npcCF = CFrame.new(6110, 18, 1550),
+        questName = "FishmanQuest",
+        questId = 2,
+        mobKey = {"Fishman Commando"},
+        mobCF = CFrame.new(6200, 18, 1400)
+    },
+    {
+        name = "God's Guards (Lvl 450)",
+        minLevel = 450,
+        npcCF = CFrame.new(-4510, 1000, -2500),
+        questName = "SkyExp1Quest",
+        questId = 1,
+        mobKey = {"God's Guard"},
+        mobCF = CFrame.new(-4600, 1000, -2600)
+    },
+    {
+        name = "Shandas (Lvl 475)",
+        minLevel = 475,
+        npcCF = CFrame.new(-4510, 1000, -2500),
+        questName = "SkyExp1Quest",
+        questId = 2,
+        mobKey = {"Shanda"},
+        mobCF = CFrame.new(-4300, 1000, -2400)
+    },
+    {
+        name = "Royal Squads (Lvl 525)",
+        minLevel = 525,
+        npcCF = CFrame.new(-5200, 1200, -2000),
+        questName = "SkyExp2Quest",
+        questId = 1,
+        mobKey = {"Royal Squad"},
+        mobCF = CFrame.new(-5300, 1200, -2100)
+    },
+    {
+        name = "Royal Soldiers (Lvl 550)",
+        minLevel = 550,
+        npcCF = CFrame.new(-5200, 1200, -2000),
+        questName = "SkyExp2Quest",
+        questId = 2,
+        mobKey = {"Royal Soldier"},
+        mobCF = CFrame.new(-5100, 1200, -1900)
+    },
+    {
+        name = "Galley Pirates (Lvl 575)",
+        minLevel = 575,
+        npcCF = CFrame.new(5120, 4, 4100),
+        questName = "FountainQuest",
+        questId = 1,
+        mobKey = {"Galley Pirate"},
+        mobCF = CFrame.new(5200, 4, 3900)
+    },
+    {
+        name = "Galley Captains (Lvl 625)",
+        minLevel = 625,
+        npcCF = CFrame.new(5120, 4, 4100),
+        questName = "FountainQuest",
+        questId = 2,
+        mobKey = {"Galley Captain"},
+        mobCF = CFrame.new(5400, 4, 4000)
+    }
 }
 
-local questOptions = {}
+-- Fetch options for manual dropdown override
+local questOptions = {"(Auto Select Best)"}
 for _, q in ipairs(Sea1Quests) do table.insert(questOptions, q.name) end
 
-local bfQuestIndex = 1
+local manualQuestIndex = 0 -- 0 means auto-detect based on level
 BFTab:AddDropdown({
-    Name = "Start Quest from...", Default = questOptions[1],
+    Name = "Active Farm Quest", Default = questOptions[1],
     Options = questOptions,
     Callback = function(v)
-        for i, q in ipairs(Sea1Quests) do
-            if q.name == v then bfQuestIndex = i; break end
+        if v == "(Auto Select Best)" then
+            manualQuestIndex = 0
+        else
+            for i, q in ipairs(Sea1Quests) do
+                if q.name == v then manualQuestIndex = i; break end
+            end
         end
     end
 })
 
-local bfAutoQuestOn  = false
-local bfQuestStatus  = "Idle"
+-- Weapon Type Selection Dropdown
+local selectedWeaponType = "Melee"
+BFTab:AddDropdown({
+    Name = "Select Weapon Type", Default = "Melee",
+    Options = {"Melee", "Sword", "Blox Fruit"},
+    Callback = function(v)
+        selectedWeaponType = v
+    end
+})
 
--- Helper: find quest NPC in workspace near a position
-local function FindQuestNPC(cf, radius)
-    local best, bestDist = nil, radius or 60
-    for _, obj in ipairs(WS:GetDescendants()) do
-        if obj:IsA("Model") then
-            local nm = obj.Name:lower()
-            if nm:find("quest") or nm:find("npc") or nm:find("master") or nm:find("trainer") then
+local bfAutoQuestOn = false
+local bfQuestStatus = "Idle"
+local farmPlatform = nil
+
+-- Helper to get player's dynamic level
+local function GetPlayerLevel()
+    local lvl = 1
+    pcall(function()
+        if LP:FindFirstChild("Data") and LP.Data:FindFirstChild("Level") then
+            lvl = LP.Data.Level.Value
+        elseif LP:FindFirstChild("leaderstats") and LP.leaderstats:FindFirstChild("Level") then
+            lvl = LP.leaderstats.Level.Value
+        elseif LP:FindFirstChild("leaderstats") and LP.leaderstats:FindFirstChild("Lvl") then
+            lvl = LP.leaderstats.Lvl.Value
+        end
+    end)
+    return lvl
+end
+
+-- Helper to find active quest state
+local function HasActiveQuest()
+    local has = false
+    pcall(function()
+        local mainGui = LP:WaitForChild("PlayerGui", 5):FindFirstChild("Main")
+        if mainGui and mainGui:FindFirstChild("Quest") and mainGui.Quest.Visible then
+            has = true
+        end
+    end)
+    return has
+end
+
+-- Find Quest NPC on Workspace
+local function FindQuestNPC(npcCF, radius)
+    radius = radius or 150
+    local closestNPC = nil
+    local closestDist = radius
+    pcall(function()
+        for _, obj in ipairs(WS:GetDescendants()) do
+            if obj:IsA("Model") and (obj.Name:lower():find("quest") or obj.Name:lower():find("giver") or obj.Name:lower():find("npc")) then
                 local rp = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart
                 if rp then
-                    local d = (rp.Position - cf.Position).Magnitude
-                    if d < bestDist then bestDist = d; best = obj end
-                end
-            end
-        end
-    end
-    return best
-end
-
--- Helper: find mobs matching keywords
-local function FindNearestMobByKey(hrp, keywords, range)
-    local best, bestDist = nil, range or 100
-    for _, obj in ipairs(WS:GetDescendants()) do
-        if obj:IsA("Humanoid") and obj.Health > 0 and not Players:GetPlayerFromCharacter(obj.Parent) then
-            local nm = obj.Parent.Name
-            for _, kw in ipairs(keywords) do
-                if nm:find(kw) then
-                    local rp = obj.Parent:FindFirstChild("HumanoidRootPart")
-                    if rp and rp.Position.Y < 8000 then
-                        local d = (hrp.Position - rp.Position).Magnitude
-                        if d < bestDist then bestDist = d; best = rp end
+                    local dist = (rp.Position - npcCF.Position).Magnitude
+                    if dist < closestDist then
+                        closestDist = dist
+                        closestNPC = obj
                     end
-                    break
                 end
             end
         end
-    end
-    return best
+    end)
+    return closestNPC
 end
 
+-- Create safe farm platform so player hovers stably in air
+local function createFarmPlatform(pos)
+    pcall(function()
+        if not farmPlatform or not farmPlatform.Parent then
+            farmPlatform = Instance.new("Part")
+            farmPlatform.Name = "BaddieFarmPlatform"
+            farmPlatform.Size = Vector3.new(20, 1, 20)
+            farmPlatform.Transparency = 1
+            farmPlatform.Anchored = true
+            farmPlatform.CanCollide = true
+            farmPlatform.Parent = WS
+        end
+        farmPlatform.CFrame = CFrame.new(pos) - Vector3.new(0, 3, 0)
+    end)
+end
+
+local function destroyFarmPlatform()
+    pcall(function()
+        if farmPlatform then
+            farmPlatform:Destroy()
+            farmPlatform = nil
+        end
+    end)
+end
+
+-- Auto equip tools based on category
+local function autoEquipWeapon()
+    local char = LP.Character
+    if not char then return end
+    -- Check if already holding a tool of the correct category
+    for _, child in ipairs(char:GetChildren()) do
+        if child:IsA("Tool") then
+            local isMatch = false
+            if selectedWeaponType == "Melee" and (child.ToolTip == "Melee" or child.Name == "Combat" or child.Name:lower():find("step") or child.Name:lower():find("claw") or child.Name:lower():find("kung") or child.Name:lower():find("fist")) then
+                isMatch = true
+            elseif selectedWeaponType == "Sword" and (child.ToolTip == "Sword" or child.Name == "Katana" or child.Name == "Cutlass" or child.Name:lower():find("blade") or child.Name:lower():find("saber") or child.Name:lower():find("sword")) then
+                isMatch = true
+            elseif selectedWeaponType == "Blox Fruit" and (child.ToolTip == "Blox Fruit" or child.Name:lower():find("fruit") or child.Name == "Ice" or child.Name == "Light" or child.Name == "Magma") then
+                isMatch = true
+            end
+            if isMatch then return child end
+        end
+    end
+    -- Search Backpack
+    for _, tool in ipairs(LP.Backpack:GetChildren()) do
+        if tool:IsA("Tool") then
+            local isMatch = false
+            if selectedWeaponType == "Melee" and (tool.ToolTip == "Melee" or tool.Name == "Combat" or tool.Name:lower():find("step") or tool.Name:lower():find("claw") or tool.Name:lower():find("kung") or tool.Name:lower():find("fist")) then
+                isMatch = true
+            elseif selectedWeaponType == "Sword" and (tool.ToolTip == "Sword" or tool.Name == "Katana" or tool.Name == "Cutlass" or tool.Name:lower():find("blade") or tool.Name:lower():find("saber") or tool.Name:lower():find("sword")) then
+                isMatch = true
+            elseif selectedWeaponType == "Blox Fruit" and (tool.ToolTip == "Blox Fruit" or tool.Name:lower():find("fruit") or tool.Name == "Ice" or tool.Name == "Light" or tool.Name == "Magma") then
+                isMatch = true
+            end
+            if isMatch then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum then hum:EquipTool(tool); return tool end
+            end
+        end
+    end
+    -- Fallback: Equip first tool in backpack if preferred type is not found
+    for _, tool in ipairs(LP.Backpack:GetChildren()) do
+        if tool:IsA("Tool") then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then hum:EquipTool(tool); return tool end
+        end
+    end
+end
+
+-- High performance mobile/PC mob magnet (pulls matching mobs to target coordinate)
+local function pullMobs(keywords, targetPos)
+    local myHrp = GetHRP()
+    if not myHrp then return end
+    pcall(function()
+        local op = OverlapParams.new()
+        op.FilterType = Enum.RaycastFilterType.Exclude
+        op.FilterDescendantsInstances = {LP.Character}
+        
+        local parts = WS:GetPartBoundsInRadius(myHrp.Position, 250, op)
+        for _, part in ipairs(parts) do
+            local char = part.Parent
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local r_hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hum and hum.Health > 0 and r_hrp and not Players:GetPlayerFromCharacter(char) then
+                local isMob = false
+                for _, kw in ipairs(keywords) do
+                    if char.Name:lower():find(kw:lower()) then
+                        isMob = true
+                        break
+                    end
+                end
+                if isMob then
+                    r_hrp.CanCollide = false
+                    -- Teleport exactly in front of and slightly below player (safely within attack range)
+                    r_hrp.CFrame = CFrame.new(targetPos) * CFrame.new(0, -3.5, -2.5)
+                    r_hrp.Velocity = Vector3.zero
+                    -- Stop mob from hitting back (God Mode platform freeze)
+                    hum.PlatformStand = true
+                end
+            end
+        end
+    end)
+end
+
+-- Pro-grade combat M1 + remote attack triggering (extremely rapid no-cooldown)
+local function fastAttack()
+    pcall(function()
+        local rtc = game:GetService("ReplicatedStorage"):FindFirstChild("RigControllerToClient")
+        if rtc and rtc:FindFirstChild("ClientReady") then
+            rtc.ClientReady:FireServer()
+        end
+    end)
+    pcall(function()
+        -- Activate current weapon
+        local char = LP.Character
+        if char then
+            for _, child in ipairs(char:GetChildren()) do
+                if child:IsA("Tool") then
+                    child:Activate()
+                end
+            end
+        end
+    end)
+    pcall(function()
+        local vu = game:GetService("VirtualUser")
+        vu:Button1Down(Vector2.new(0, 0), Camera.CFrame)
+        task.wait(0.005)
+        vu:Button1Up(Vector2.new(0, 0), Camera.CFrame)
+    end)
+end
+
+-- Main Auto Farm Loop
 BFTab:AddToggle({ Name = "Sea 1 Auto Quest (FULL LOOP)", Default = false,
     Callback = function(on)
         bfAutoQuestOn = on
-        if on then
-            task.spawn(function()
-                local qi = bfQuestIndex
-                while bfAutoQuestOn do
-                    local q = Sea1Quests[qi]
-                    if not q then qi = 1; continue end
-
-                    bfQuestStatus = "Going to: "..q.name
-                    OrionLib:MakeNotification({ Name = "Auto Quest", Content = q.name, Image = ICON, Time = 4 })
-
-                    -- Step 1: Teleport to NPC zone (smooth)
-                    pcall(function()
-                        SafeTP(q.npcCF * CFrame.new(0,3,5))
-                    end)
-                    task.wait(1)
-
-                    -- Step 2: Interact with quest NPC
-                    local npc = FindQuestNPC(q.npcCF, 80)
-                    if npc then
-                        local rp = npc:FindFirstChild("HumanoidRootPart") or npc.PrimaryPart
-                        if rp then SafeTP(CFrame.new(rp.Position + Vector3.new(0,0,5)), true); task.wait(0.5) end
-                        TryFireProximity(npc, 25)
-                        task.wait(0.3)
-                        TryClickDetector(npc)
+        if not on then
+            bfQuestStatus = "Idle"
+            destroyFarmPlatform()
+            return
+        end
+        
+        task.spawn(function()
+            while bfAutoQuestOn do
+                pcall(function()
+                    local level = GetPlayerLevel()
+                    local q = nil
+                    
+                    if manualQuestIndex > 0 then
+                        q = Sea1Quests[manualQuestIndex]
+                    else
+                        -- Auto detect optimal quest by player level
+                        for _, sq in ipairs(Sea1Quests) do
+                            if level >= sq.minLevel then
+                                q = sq
+                            end
+                        end
                     end
-                    task.wait(1)
-
-                    -- Step 3: Farm mobs for quest duration
-                    bfQuestStatus = "Farming: "..q.name
-                    local farmEnd = tick() + q.farmTime
-                    while bfAutoQuestOn and tick() < farmEnd do
+                    
+                    if not q then q = Sea1Quests[1] end
+                    
+                    local hasQuest = HasActiveQuest()
+                    
+                    if not hasQuest then
+                        bfQuestStatus = "Taking quest: " .. q.name
+                        -- Try bypass remote invocation first (fastest, remote auto-accept)
                         pcall(function()
-                            local hrp = GetHRP()
-                            if not hrp then return end
-                            -- Try keyword mobs first
-                            local mob = FindNearestMobByKey(hrp, q.mobKey, bfFarmRange)
-                            if mob then
-                                hrp.CFrame = mob.CFrame * CFrame.new(0,0,3.5); task.wait(0.05)
-                                AttackNearest(hrp, 8)
-                            else
-                                -- Fallback: attack any nearby mob
-                                AttackNearest(hrp, bfFarmRange)
+                            local commF = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes") and game.ReplicatedStorage.Remotes:FindFirstChild("CommF_")
+                            if commF then
+                                commF:InvokeServer("StartQuest", q.questName, q.questId)
                             end
                         end)
-                        task.wait(0.25)
-                    end
-
-                    -- Step 4: Return to NPC to hand in
-                    if bfAutoQuestOn then
-                        pcall(function() SafeTP(q.npcCF * CFrame.new(0,3,5)) end)
                         task.wait(0.5)
-                        local npc2 = FindQuestNPC(q.npcCF, 80)
-                        if npc2 then
-                            TryFireProximity(npc2, 25)
-                            task.wait(0.3)
-                            TryClickDetector(npc2)
+                        
+                        -- If remote bypassed failed, walk/TP to NPC as fallback
+                        if not HasActiveQuest() then
+                            SafeTP(q.npcCF * CFrame.new(0, 3, 5))
+                            task.wait(1)
+                            local npc = FindQuestNPC(q.npcCF, 120)
+                            if npc then
+                                local rp = npc:FindFirstChild("HumanoidRootPart") or npc.PrimaryPart
+                                if rp then SafeTP(CFrame.new(rp.Position + Vector3.new(0,0,5)), true); task.wait(0.3) end
+                                TryFireProximity(npc, 25)
+                                task.wait(0.2)
+                                TryClickDetector(npc)
+                            end
+                            task.wait(1)
                         end
-                        task.wait(1)
+                    else
+                        -- If we have an active quest, teleport to mob zone and group them
+                        bfQuestStatus = "Farming: " .. q.name
+                        local targetFarmPos = q.mobCF.Position + Vector3.new(0, 18, 0) -- safe hovering altitude
+                        
+                        local hrp = GetHRP()
+                        if hrp then
+                            createFarmPlatform(targetFarmPos)
+                            SafeTP(CFrame.new(targetFarmPos))
+                            
+                            -- Magnet, Weapon Equip, Fast Attack
+                            pullMobs(q.mobKey, targetFarmPos)
+                            autoEquipWeapon()
+                            fastAttack()
+                        end
                     end
-
-                    -- Move to next quest
-                    qi = qi + 1
-                    if qi > #Sea1Quests then qi = 1 end
-                end
-                bfQuestStatus = "Idle"
-            end)
-        else
+                end)
+                task.wait(0.05)
+            end
             bfQuestStatus = "Idle"
+            destroyFarmPlatform()
+        end)
+    end
+})
+
+-- ---------- AUTO STATS ----------
+BFTab:AddSection({ Name = "Auto Stats Allocator" })
+
+local autoStats = {
+    Melee = false,
+    Defense = false,
+    Sword = false,
+    ["Blox Fruit"] = false
+}
+
+BFTab:AddToggle({ Name = "Auto Stats Melee", Default = false,
+    Callback = function(on) autoStats.Melee = on end
+})
+BFTab:AddToggle({ Name = "Auto Stats Defense", Default = false,
+    Callback = function(on) autoStats.Defense = on end
+})
+BFTab:AddToggle({ Name = "Auto Stats Sword", Default = false,
+    Callback = function(on) autoStats.Sword = on end
+})
+BFTab:AddToggle({ Name = "Auto Stats Blox Fruit", Default = false,
+    Callback = function(on) autoStats["Blox Fruit"] = on end
+})
+
+-- Background daemon for auto stats spending
+task.spawn(function()
+    while true do
+        task.wait(1)
+        local hasStat = false
+        for _, enabled in pairs(autoStats) do
+            if enabled then hasStat = true; break end
         end
+        if hasStat then
+            pcall(function()
+                local points = 0
+                if LP:FindFirstChild("Data") and LP.Data:FindFirstChild("Points") then
+                    points = LP.Data.Points.Value
+                elseif LP:FindFirstChild("leaderstats") and LP.leaderstats:FindFirstChild("Points") then
+                    points = LP.leaderstats.Points.Value
+                end
+                
+                if points > 0 then
+                    local commF = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes") and game.ReplicatedStorage.Remotes:FindFirstChild("CommF_")
+                    if commF then
+                        for stat, enabled in pairs(autoStats) do
+                            if enabled then
+                                commF:InvokeServer("AddPoint", stat, points)
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- ---------- AUTO BUY SHOP ITEM ----------
+BFTab:AddSection({ Name = "Auto Buy Shop Items" })
+
+BFTab:AddButton({ Name = "Buy Black Leg (150,000 Beli)",
+    Callback = function()
+        pcall(function()
+            local commF = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes") and game.ReplicatedStorage.Remotes:FindFirstChild("CommF_")
+            if commF then
+                local res = commF:InvokeServer("BuyBlackLeg")
+                OrionLib:MakeNotification({ Name = "Shop Purchase", Content = "Brought style Black Leg!", Image = ICON, Time = 3 })
+            end
+        end)
+    end
+})
+
+BFTab:AddButton({ Name = "Buy Electro (500,000 Beli)",
+    Callback = function()
+        pcall(function()
+            local commF = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes") and game.ReplicatedStorage.Remotes:FindFirstChild("CommF_")
+            if commF then
+                local res = commF:InvokeServer("BuyElectro")
+                OrionLib:MakeNotification({ Name = "Shop Purchase", Content = "Brought style Electro!", Image = ICON, Time = 3 })
+            end
+        end)
+    end
+})
+
+BFTab:AddButton({ Name = "Buy Water Kung Fu (750,000 Beli)",
+    Callback = function()
+        pcall(function()
+            local commF = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes") and game.ReplicatedStorage.Remotes:FindFirstChild("CommF_")
+            if commF then
+                local res = commF:InvokeServer("BuyFishmanKungFu")
+                OrionLib:MakeNotification({ Name = "Shop Purchase", Content = "Brought style Water Kung Fu!", Image = ICON, Time = 3 })
+            end
+        end)
+    end
+})
+
+BFTab:AddButton({ Name = "Buy Katana (1,000 Beli)",
+    Callback = function()
+        pcall(function()
+            local commF = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes") and game.ReplicatedStorage.Remotes:FindFirstChild("CommF_")
+            if commF then
+                local res = commF:InvokeServer("BuyItem", "Katana")
+                OrionLib:MakeNotification({ Name = "Shop Purchase", Content = "Brought Katana sword!", Image = ICON, Time = 3 })
+            end
+        end)
+    end
+})
+
+BFTab:AddButton({ Name = "Buy Triple Katana (60,000 Beli)",
+    Callback = function()
+        pcall(function()
+            local commF = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes") and game.ReplicatedStorage.Remotes:FindFirstChild("CommF_")
+            if commF then
+                local res = commF:InvokeServer("BuyItem", "Triple Katana")
+                OrionLib:MakeNotification({ Name = "Shop Purchase", Content = "Brought Triple Katana!", Image = ICON, Time = 3 })
+            end
+        end)
     end
 })
 
@@ -1151,19 +1604,19 @@ BFTab:AddToggle({ Name = "Auto Collect Fruits", Default = false,
 BFTab:AddSection({ Name = "Island Teleport" })
 
 local bfIslands = {
-    ["Starter Pirate Island"] = CFrame.new(-1371,5,1235),
-    ["Starter Marine Island"] = CFrame.new(977,14,1430),
-    ["Jungle"]                = CFrame.new(-139,13,1565),
-    ["Pirate Village"]        = CFrame.new(-1410,9,-398),
-    ["Desert"]                = CFrame.new(936,8,3245),
-    ["Snowy Mountain"]        = CFrame.new(1175,42,-1640),
-    ["Marine Fortress"]       = CFrame.new(-1635,9,513),
-    ["Skylands"]              = CFrame.new(-4980,620,-5060),
-    ["Prison"]                = CFrame.new(4830,6,4775),
-    ["Colosseum"]             = CFrame.new(-597,22,-1640),
-    ["Magma Village"]         = CFrame.new(-4690,130,-588),
-    ["Icy Cave"]              = CFrame.new(-3827,80,-1400),
-    ["Fountain City (Sea2)"]  = CFrame.new(-749,15,5233),
+    ["Starter Island"]       = CFrame.new(1060, 16, 1500),
+    ["Jungle"]               = CFrame.new(-1600, 37, 150),
+    ["Pirate Village"]       = CFrame.new(-1136, 4, 3855),
+    ["Desert"]               = CFrame.new(894, 6, 4385),
+    ["Snowy Mountain"]       = CFrame.new(1386, 26, -1300),
+    ["Marine Fortress"]      = CFrame.new(-4850, 20, 4300),
+    ["Skylands (Lower)"]     = CFrame.new(-1243, 355, -5900),
+    ["Skylands (Upper)"]     = CFrame.new(-4510, 1000, -2500),
+    ["Prison"]               = CFrame.new(4830, 6, 4775),
+    ["Colosseum"]            = CFrame.new(-1580, 7, -2980),
+    ["Magma Village"]        = CFrame.new(-5200, 8, 8400),
+    ["Underwater City"]      = CFrame.new(6110, 18, 1550),
+    ["Fountain City"]        = CFrame.new(5120, 4, 4100)
 }
 
 local islandList = {}
