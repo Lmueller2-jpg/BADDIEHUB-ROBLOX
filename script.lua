@@ -1068,9 +1068,9 @@ if DetectedGame == "Blox Fruits" then
             local parts = WS:GetPartBoundsInRadius(myHrp.Position, 220, op)
             for _, part in ipairs(parts) do
                 local char = part.Parent
-                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                local hum = char and char:FindFirstChild("Humanoid")
                 local r_hrp = char and char:FindFirstChild("HumanoidRootPart")
-                if hum and hum.Health > 0 and r_hrp and not Players:GetPlayerFromCharacter(char) then
+                if hum and hum.Health > 0 and r_hrp and r_hrp.Position.Y <= 50000 and not Players:GetPlayerFromCharacter(char) then
                     local isMob = false
                     for _, kw in ipairs(keywords) do
                         if char.Name:lower():find(kw:lower()) then isMob = true; break end
