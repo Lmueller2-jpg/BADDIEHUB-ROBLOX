@@ -1,16 +1,15 @@
 -- =============================================================================
--- BADDIE404 MULTIHUB v3.1
+-- BADDIE404 MULTIHUB v4.0
 -- Executors: Delta, Fluxus, Solara, Synapse X
--- 100% ASCII - no UTF-8 special chars
+-- 100% ASCII - no UTF-8
+-- Fixes: sliders persistent, player-TP dropdown, hover, kill aura, drag
 -- =============================================================================
 
--- Cleanup: remove old instances
-for _, name in ipairs({"Orion", "Baddie404Hub", "Baddie404Loading"}) do
-    local old = game:GetService("CoreGui"):FindFirstChild(name)
+for _, n in ipairs({"Orion","Baddie404Hub","Baddie404Loading"}) do
+    local old = game:GetService("CoreGui"):FindFirstChild(n)
     if old then old:Destroy() end
 end
 
--- Services
 local Players          = game:GetService("Players")
 local RunService       = game:GetService("RunService")
 local TweenService     = game:GetService("TweenService")
@@ -64,7 +63,7 @@ local SubL = Instance.new("TextLabel", Card)
 SubL.Position = UDim2.new(0,18,0,44)
 SubL.Size = UDim2.new(1,-36,0,16)
 SubL.BackgroundTransparency = 1
-SubL.Text = "v3.1"
+SubL.Text = "v4.0"
 SubL.TextColor3 = Color3.fromRGB(120,100,200)
 SubL.TextSize = 12
 SubL.Font = Enum.Font.Gotham
@@ -111,12 +110,10 @@ local function SetProgress(pct, dur)
     PctL.Text = pct .. "%"
 end
 
-local function SetStatus(txt)
-    StatusL.Text = txt
-end
+local function SetStatus(txt) StatusL.Text = txt end
 
 -- =============================================================================
--- ORION LOAD  (safeGet works on Delta, Fluxus, Synapse X, Solara)
+-- ORION LOAD
 -- =============================================================================
 
 local function safeGet(url)
@@ -176,12 +173,8 @@ local Games = {
 
 local DetectedGame = nil
 for name, ids in pairs(Games) do
-    if table.find(ids, PlaceId) then
-        DetectedGame = name
-        break
-    end
+    if table.find(ids, PlaceId) then DetectedGame = name; break end
 end
-
 local Universal = (DetectedGame == nil)
 if Universal then DetectedGame = "Unknown" end
 
@@ -198,43 +191,17 @@ SetProgress(96, 0.3)
 task.wait(0.3)
 
 local Window = OrionLib:MakeWindow({
-    Name        = "Baddie404  |  " .. DetectedGame,
-    HidePremium = false,
-    SaveConfig  = true,
+    Name         = "Baddie404  |  " .. DetectedGame,
+    HidePremium  = false,
+    SaveConfig   = true,
     ConfigFolder = "Baddie404",
-    IntroText   = "Baddie404 Hub",
-    IntroIcon   = ICON,
+    IntroText    = "Baddie404 Hub",
+    IntroIcon    = ICON,
 })
 
 -- =============================================================================
--- HOME TAB
+-- HELPER FUNCTIONS
 -- =============================================================================
-
-local HomeTab = Window:MakeTab({ Name = "Home", Icon = ICON, PremiumOnly = false })
-
-HomeTab:AddSection({ Name = "Info" })
-HomeTab:AddLabel("Player: " .. LP.Name)
-HomeTab:AddLabel("Game: " .. DetectedGame .. "  |  PlaceId: " .. tostring(PlaceId))
-
-if Universal then
-    HomeTab:AddParagraph("Game not detected",
-        "Your game is not in the list. Only universal features are active. "
-        .. "PlaceId " .. tostring(PlaceId))
-end
-
-HomeTab:AddSection({ Name = "Misc" })
-HomeTab:AddButton({
-    Name = "Test Notification",
-    Callback = function()
-        OrionLib:MakeNotification({ Name = "Test", Content = "Everything works.", Image = ICON, Time = 3 })
-    end
-})
-
--- =============================================================================
--- PLAYER TAB
--- =============================================================================
-
-local PlayerTab = Window:MakeTab({ Name = "Player", Icon = ICON, PremiumOnly = false })
 
 local function GetHum()
     local char = LP.Character
@@ -248,25 +215,140 @@ local function GetHRP()
     return char:FindFirstChild("HumanoidRootPart")
 end
 
+-- Safe teleport: sets CFrame 3 times over 3 frames to bypass anti-TP
+local function SafeTP(cf)
+    pcall(function()
+        local hrp = GetHRP()
+        if not hrp then return end
+        for _ = 1, 3 do
+            hrp.CFrame = cf
+            task.wait()
+        end
+    end)
+end
+
+-- Attack nearest mob (VirtualUser click + ClickDetector fallback)
+local function AttackNearest(hrp, range)
+    local nearest, nearestDist = nil, range
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Humanoid") and obj.Health > 0 then
+            local rp = obj.Parent and obj.Parent:FindFirstChild("HumanoidRootPart")
+            if rp and not Players:GetPlayerFromCharacter(obj.Parent)
+               and rp.Position.Y < 5000 then
+                local dist = (hrp.Position - rp.Position).Magnitude
+                if dist < nearestDist then
+                    nearestDist = dist
+                    nearest = rp
+                end
+            end
+        end
+    end
+    if nearest then
+        -- Teleport next to mob
+        hrp.CFrame = nearest.CFrame * CFrame.new(0, 0, 3)
+        task.wait(0.05)
+        -- Try VirtualUser click
+        pcall(function()
+            local vu = game:GetService("VirtualUser")
+            local sp = Camera:WorldToScreenPoint(nearest.Position)
+            vu:Button1Down(Vector2.new(sp.X, sp.Y), Camera.CFrame)
+            task.wait(0.08)
+            vu:Button1Up(Vector2.new(sp.X, sp.Y), Camera.CFrame)
+        end)
+        -- Try ClickDetector fallback
+        pcall(function()
+            for _, cd in ipairs(nearest.Parent:GetDescendants()) do
+                if cd:IsA("ClickDetector") then
+                    fireclickdetector(cd)
+                end
+            end
+        end)
+        -- Try TouchInterest fallback
+        pcall(function()
+            local char = LP.Character
+            if char then
+                local lhrp = char:FindFirstChild("HumanoidRootPart")
+                if lhrp then
+                    for _, part in ipairs(nearest.Parent:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            pcall(function() firetouchinterest(lhrp, part, 0) end)
+                            pcall(function() firetouchinterest(lhrp, part, 1) end)
+                        end
+                    end
+                end
+            end
+        end)
+    end
+    return nearest
+end
+
+-- =============================================================================
+-- PERSISTENT STATS (applied every heartbeat so sliders always work)
+-- =============================================================================
+
+local statWalkSpeed  = 16
+local statJumpPower  = 50
+local statGravity    = 196
+
+RunService.Heartbeat:Connect(function()
+    pcall(function()
+        local h = GetHum()
+        if h then
+            if h.WalkSpeed ~= statWalkSpeed then h.WalkSpeed = statWalkSpeed end
+            if h.UseJumpPower then
+                if h.JumpPower ~= statJumpPower then h.JumpPower = statJumpPower end
+            end
+        end
+        if Workspace.Gravity ~= statGravity then Workspace.Gravity = statGravity end
+    end)
+end)
+
+-- =============================================================================
+-- HOME TAB
+-- =============================================================================
+
+local HomeTab = Window:MakeTab({ Name = "Home", Icon = ICON, PremiumOnly = false })
+HomeTab:AddSection({ Name = "Info" })
+HomeTab:AddLabel("Player: " .. LP.Name)
+HomeTab:AddLabel("Game: " .. DetectedGame .. "  |  PlaceId: " .. tostring(PlaceId))
+HomeTab:AddLabel("Version: v4.0")
+
+if Universal then
+    HomeTab:AddParagraph("Game not detected",
+        "Your game is not in the list. Universal features are active. PlaceId: " .. tostring(PlaceId))
+end
+
+HomeTab:AddSection({ Name = "Test" })
+HomeTab:AddButton({
+    Name = "Test Notification",
+    Callback = function()
+        OrionLib:MakeNotification({ Name = "Test", Content = "Hub works!", Image = ICON, Time = 3 })
+    end
+})
+
+-- =============================================================================
+-- PLAYER TAB
+-- =============================================================================
+
+local PlayerTab = Window:MakeTab({ Name = "Player", Icon = ICON, PremiumOnly = false })
+
 -- Movement
 PlayerTab:AddSection({ Name = "Movement" })
 
 PlayerTab:AddSlider({
     Name = "WalkSpeed", Min = 0, Max = 500, Default = 16,
     Color = Color3.fromRGB(90,160,255), Increment = 1, ValueName = "studs/s",
-    Callback = function(v)
-        pcall(function() GetHum().WalkSpeed = v end)
-    end
+    Callback = function(v) statWalkSpeed = v end
 })
 
 PlayerTab:AddSlider({
     Name = "JumpPower", Min = 0, Max = 600, Default = 50,
     Color = Color3.fromRGB(90,255,160), Increment = 5, ValueName = "power",
     Callback = function(v)
+        statJumpPower = v
         pcall(function()
             local h = GetHum()
-            h.UseJumpPower = true
-            h.JumpPower = v
+            if h then h.UseJumpPower = true end
         end)
     end
 })
@@ -274,9 +356,7 @@ PlayerTab:AddSlider({
 PlayerTab:AddSlider({
     Name = "Gravity", Min = 0, Max = 196, Default = 196,
     Color = Color3.fromRGB(255,180,90), Increment = 1, ValueName = "",
-    Callback = function(v)
-        Workspace.Gravity = v
-    end
+    Callback = function(v) statGravity = v end
 })
 
 -- Inf Jump
@@ -297,7 +377,7 @@ PlayerTab:AddToggle({
                     pcall(function()
                         local hrp = GetHRP()
                         if hrp then
-                            hrp.Velocity = Vector3.new(hrp.Velocity.X, GetHum().JumpPower or 50, hrp.Velocity.Z)
+                            hrp.Velocity = Vector3.new(hrp.Velocity.X, statJumpPower, hrp.Velocity.Z)
                         end
                     end)
                 end
@@ -325,15 +405,15 @@ end
 local function StartFly()
     FlyEnabled = true
     local char = LP.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+    local hum  = char and char:FindFirstChildOfClass("Humanoid")
     if not hrp or not hum then StopFly(); return end
 
     hum.PlatformStand = true
 
     flyBV = Instance.new("BodyVelocity", hrp)
-    flyBV.Velocity = Vector3.zero
-    flyBV.MaxForce = Vector3.new(1e9,1e9,1e9)
+    flyBV.Velocity  = Vector3.zero
+    flyBV.MaxForce  = Vector3.new(1e9,1e9,1e9)
 
     flyBG = Instance.new("BodyGyro", hrp)
     flyBG.MaxTorque = Vector3.new(1e9,1e9,1e9)
@@ -369,6 +449,65 @@ PlayerTab:AddSlider({
     Callback = function(v) flySpeed = v end
 })
 
+-- Hover (float above ground permanently)
+local HoverOn = false
+local hoverConn = nil
+local hoverHeight = 15
+local hoverBP = nil
+
+local function StopHover()
+    HoverOn = false
+    if hoverConn then hoverConn:Disconnect(); hoverConn = nil end
+    pcall(function()
+        if hoverBP then hoverBP:Destroy(); hoverBP = nil end
+        local h = GetHum()
+        if h then h.PlatformStand = false end
+    end)
+end
+
+PlayerTab:AddToggle({
+    Name = "Hover (float above ground)", Default = false,
+    Callback = function(on)
+        HoverOn = on
+        if hoverConn then hoverConn:Disconnect(); hoverConn = nil end
+        if not on then StopHover(); return end
+
+        hoverConn = RunService.Heartbeat:Connect(function()
+            if not HoverOn then return end
+            pcall(function()
+                local hrp = GetHRP()
+                local hum = GetHum()
+                if not hrp or not hum then return end
+                hum.PlatformStand = true
+
+                -- Raycast down to find ground
+                local params = RaycastParams.new()
+                params.FilterDescendantsInstances = {LP.Character}
+                params.FilterType = Enum.RaycastFilterType.Exclude
+                local ray = Workspace:Raycast(hrp.Position, Vector3.new(0, -500, 0), params)
+                local groundY = ray and ray.Position.Y or (hrp.Position.Y - hoverHeight)
+                local targetY = groundY + hoverHeight
+
+                -- Create or reuse BodyPosition
+                if not hoverBP or not hoverBP.Parent then
+                    hoverBP = Instance.new("BodyPosition", hrp)
+                    hoverBP.Name = "HoverBP"
+                    hoverBP.MaxForce = Vector3.new(0, 1e9, 0)
+                    hoverBP.D = 500
+                    hoverBP.P = 15000
+                end
+                hoverBP.Position = Vector3.new(hrp.Position.X, targetY, hrp.Position.Z)
+            end)
+        end)
+    end
+})
+
+PlayerTab:AddSlider({
+    Name = "Hover Height", Min = 3, Max = 100, Default = 15,
+    Color = Color3.fromRGB(180,120,255), Increment = 1, ValueName = "studs",
+    Callback = function(v) hoverHeight = v end
+})
+
 -- Noclip
 local NoclipOn = false
 local noclipConn = nil
@@ -384,9 +523,7 @@ PlayerTab:AddToggle({
                     local char = LP.Character
                     if not char then return end
                     for _, p in ipairs(char:GetDescendants()) do
-                        if p:IsA("BasePart") and p.CanCollide then
-                            p.CanCollide = false
-                        end
+                        if p:IsA("BasePart") and p.CanCollide then p.CanCollide = false end
                     end
                 end)
             end)
@@ -405,31 +542,29 @@ PlayerTab:AddToggle({
 -- Visuals
 PlayerTab:AddSection({ Name = "Visuals" })
 
-local fbOn = false
 local fbConn = nil
 local oldAmbient, oldFogEnd
 
 PlayerTab:AddToggle({
     Name = "Fullbright", Default = false,
     Callback = function(on)
-        fbOn = on
         local lighting = game:GetService("Lighting")
         if on then
             oldAmbient = lighting.Ambient
             oldFogEnd  = lighting.FogEnd
-            lighting.Ambient = Color3.new(1,1,1)
+            lighting.Ambient    = Color3.new(1,1,1)
             lighting.Brightness = 2
-            lighting.FogEnd = 1e6
+            lighting.FogEnd     = 1e6
             if fbConn then fbConn:Disconnect() end
             fbConn = RunService.Heartbeat:Connect(function()
-                lighting.Ambient = Color3.new(1,1,1)
+                lighting.Ambient    = Color3.new(1,1,1)
                 lighting.Brightness = 2
             end)
         else
             if fbConn then fbConn:Disconnect(); fbConn = nil end
-            lighting.Ambient = oldAmbient or Color3.fromRGB(70,70,70)
+            lighting.Ambient    = oldAmbient or Color3.fromRGB(70,70,70)
             lighting.Brightness = 1
-            lighting.FogEnd = oldFogEnd or 1e4
+            lighting.FogEnd     = oldFogEnd or 1e4
         end
     end
 })
@@ -443,9 +578,7 @@ PlayerTab:AddSlider({
 PlayerTab:AddSlider({
     Name = "Max Zoom", Min = 5, Max = 200, Default = 60,
     Color = Color3.fromRGB(160,200,255), Increment = 5, ValueName = "studs",
-    Callback = function(v)
-        pcall(function() LP.CameraMaxZoomDistance = v end)
-    end
+    Callback = function(v) pcall(function() LP.CameraMaxZoomDistance = v end) end
 })
 
 -- Character
@@ -501,9 +634,7 @@ PlayerTab:AddToggle({
                 if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
                     p.LocalTransparencyModifier = on and 1 or 0
                 end
-                if p:IsA("Decal") then
-                    p.Transparency = on and 1 or 0
-                end
+                if p:IsA("Decal") then p.Transparency = on and 1 or 0 end
             end
         end)
     end
@@ -514,28 +645,141 @@ PlayerTab:AddButton({
     Callback = function() pcall(function() LP:LoadCharacter() end) end
 })
 
--- Teleport
-PlayerTab:AddSection({ Name = "Teleport" })
+-- =============================================================================
+-- TELEPORT TAB (separate tab for better UX)
+-- =============================================================================
 
-PlayerTab:AddTextbox({
-    Name = "Teleport to Player", Default = "", TextDisappear = false,
-    Callback = function(input)
-        local name = input:match("^%s*(.-)%s*$")
-        if name == "" then return end
+local TpTab = Window:MakeTab({ Name = "Teleport", Icon = ICON, PremiumOnly = false })
+TpTab:AddSection({ Name = "Teleport to Player" })
+
+-- Build player list
+local function GetPlayerNames()
+    local list = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP then table.insert(list, p.Name) end
+    end
+    if #list == 0 then list = {"(no players)"}  end
+    return list
+end
+
+local tpTargetName = ""
+local tpPlayerList = GetPlayerNames()
+
+-- Dropdown shows all current players
+TpTab:AddDropdown({
+    Name = "Select Player", Default = tpPlayerList[1],
+    Options = tpPlayerList,
+    Callback = function(v)
+        tpTargetName = v
+    end
+})
+
+TpTab:AddButton({
+    Name = "Teleport to Selected Player",
+    Callback = function()
+        if tpTargetName == "" or tpTargetName == "(no players)" then
+            OrionLib:MakeNotification({ Name = "TP", Content = "Select a player first!", Image = ICON, Time = 3 })
+            return
+        end
+        local found = false
         for _, p in ipairs(Players:GetPlayers()) do
-            if p.Name:lower() == name:lower() or p.DisplayName:lower() == name:lower() then
-                pcall(function()
-                    local hrp = GetHRP()
-                    local tHrp = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
-                    if hrp and tHrp then
-                        hrp.CFrame = tHrp.CFrame * CFrame.new(3,0,3)
-                        OrionLib:MakeNotification({ Name = "Teleport", Content = "To " .. p.Name, Image = ICON, Time = 2 })
-                    end
-                end)
-                return
+            if p.Name == tpTargetName then
+                local tHrp = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+                if tHrp then
+                    SafeTP(tHrp.CFrame * CFrame.new(3,0,3))
+                    OrionLib:MakeNotification({ Name = "Teleport", Content = "To " .. p.Name, Image = ICON, Time = 2 })
+                    found = true
+                end
+                break
             end
         end
-        OrionLib:MakeNotification({ Name = "Teleport", Content = '"' .. name .. '" not found.', Image = ICON, Time = 3 })
+        if not found then
+            OrionLib:MakeNotification({ Name = "TP", Content = '"' .. tpTargetName .. '" not found or no character.', Image = ICON, Time = 3 })
+        end
+    end
+})
+
+TpTab:AddButton({
+    Name = "List Players (Notification)",
+    Callback = function()
+        local names = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LP then table.insert(names, p.Name) end
+        end
+        local msg = #names > 0 and table.concat(names, ", ") or "No other players"
+        OrionLib:MakeNotification({ Name = "Players (" .. #names .. ")", Content = msg, Image = ICON, Time = 8 })
+    end
+})
+
+TpTab:AddSection({ Name = "Teleport by Coordinates" })
+
+local tpX, tpY, tpZ = "0", "0", "0"
+
+TpTab:AddTextbox({
+    Name = "X", Default = "0", TextDisappear = false,
+    Callback = function(v) tpX = v end
+})
+TpTab:AddTextbox({
+    Name = "Y", Default = "0", TextDisappear = false,
+    Callback = function(v) tpY = v end
+})
+TpTab:AddTextbox({
+    Name = "Z", Default = "0", TextDisappear = false,
+    Callback = function(v) tpZ = v end
+})
+
+TpTab:AddButton({
+    Name = "Go to Coordinates",
+    Callback = function()
+        pcall(function()
+            local x = tonumber(tpX) or 0
+            local y = tonumber(tpY) or 0
+            local z = tonumber(tpZ) or 0
+            SafeTP(CFrame.new(x, y, z))
+            OrionLib:MakeNotification({ Name = "TP Coords", Content = x..", "..y..", "..z, Image = ICON, Time = 2 })
+        end)
+    end
+})
+
+TpTab:AddSection({ Name = "Quick Teleport" })
+
+TpTab:AddButton({
+    Name = "Teleport to Spawn",
+    Callback = function()
+        pcall(function()
+            local spawn = Workspace:FindFirstChildOfClass("SpawnLocation")
+            if spawn then
+                SafeTP(CFrame.new(spawn.Position + Vector3.new(0,5,0)))
+            else
+                SafeTP(CFrame.new(0,5,0))
+            end
+        end)
+    end
+})
+
+TpTab:AddButton({
+    Name = "Teleport to nearest Mob",
+    Callback = function()
+        pcall(function()
+            local hrp = GetHRP()
+            if not hrp then return end
+            local closest, closestDist = nil, math.huge
+            for _, h in ipairs(Workspace:GetDescendants()) do
+                if h:IsA("Humanoid") and h.Health > 0 and not Players:GetPlayerFromCharacter(h.Parent) then
+                    local rp = h.Parent:FindFirstChild("HumanoidRootPart")
+                    if rp and rp.Position.Y < 5000 then
+                        local d = (hrp.Position - rp.Position).Magnitude
+                        if d < closestDist then closestDist = d; closest = rp end
+                    end
+                end
+            end
+            if closest then
+                SafeTP(closest.CFrame * CFrame.new(0,0,4))
+                OrionLib:MakeNotification({ Name = "TP", Content = "Next mob ("..math.floor(closestDist).."st)", Image = ICON, Time = 2 })
+            else
+                OrionLib:MakeNotification({ Name = "TP", Content = "No mob found.", Image = ICON, Time = 3 })
+            end
+        end)
     end
 })
 
@@ -670,9 +914,9 @@ EspTab:AddDropdown({
     Options = {"Red","Green","Blue","Yellow","White","Cyan"},
     Callback = function(v)
         local m = {
-            ["Red"]=Color3.fromRGB(255,50,50), ["Green"]=Color3.fromRGB(50,255,80),
+            ["Red"]=Color3.fromRGB(255,50,50),  ["Green"]=Color3.fromRGB(50,255,80),
             ["Blue"]=Color3.fromRGB(60,130,255), ["Yellow"]=Color3.fromRGB(255,220,30),
-            ["White"]=Color3.fromRGB(255,255,255), ["Cyan"]=Color3.fromRGB(0,230,230)
+            ["White"]=Color3.fromRGB(255,255,255),["Cyan"]=Color3.fromRGB(0,230,230)
         }
         EspColor = m[v] or Color3.fromRGB(255,50,50)
     end
@@ -705,7 +949,7 @@ ServerTab:AddButton({
     end
 })
 
-ServerTab:AddLabel("Players on server: " .. #Players:GetPlayers() .. "/" .. Players.MaxPlayers)
+ServerTab:AddLabel("Players: " .. #Players:GetPlayers() .. "/" .. Players.MaxPlayers)
 ServerTab:AddLabel("Job ID: " .. tostring(game.JobId):sub(1,18) .. "...")
 
 -- =============================================================================
@@ -719,37 +963,22 @@ if DetectedGame == "Blox Fruits" then
     -- Auto Farm
     BFTab:AddSection({ Name = "Auto Farm" })
 
-    local bfFarmOn = false
-    local bfFarmConn = nil
+    local bfFarmOn    = false
     local bfFarmRange = 40
 
     BFTab:AddToggle({
-        Name = "Auto Farm (nearest mob)", Default = false,
+        Name = "Auto Farm (TP + Attack nearest mob)", Default = false,
         Callback = function(on)
             bfFarmOn = on
-            if bfFarmConn then bfFarmConn:Disconnect(); bfFarmConn = nil end
             if on then
-                bfFarmConn = RunService.Heartbeat:Connect(function()
-                    pcall(function()
-                        local hrp = GetHRP()
-                        if not hrp then return end
-                        local closest, closestDist = nil, bfFarmRange
-                        for _, obj in ipairs(Workspace:GetDescendants()) do
-                            if obj:IsA("Humanoid") and obj.Health > 0 then
-                                local rootPart = obj.Parent and obj.Parent:FindFirstChild("HumanoidRootPart")
-                                if rootPart and not Players:GetPlayerFromCharacter(obj.Parent) then
-                                    local dist = (hrp.Position - rootPart.Position).Magnitude
-                                    if dist < closestDist then
-                                        closestDist = dist
-                                        closest = rootPart
-                                    end
-                                end
-                            end
-                        end
-                        if closest then
-                            hrp.CFrame = closest.CFrame * CFrame.new(0,0,4)
-                        end
-                    end)
+                task.spawn(function()
+                    while bfFarmOn do
+                        pcall(function()
+                            local hrp = GetHRP()
+                            if hrp then AttackNearest(hrp, bfFarmRange) end
+                        end)
+                        task.wait(0.3)
+                    end
                 end)
             end
         end
@@ -761,10 +990,10 @@ if DetectedGame == "Blox Fruits" then
         Callback = function(v) bfFarmRange = v end
     })
 
-    -- Kill Aura (VirtualUser M1 click - no Health=0)
+    -- Kill Aura
     BFTab:AddSection({ Name = "Combat" })
 
-    local bfAuraOn = false
+    local bfAuraOn    = false
     local bfAuraRange = 20
 
     BFTab:AddToggle({
@@ -773,35 +1002,12 @@ if DetectedGame == "Blox Fruits" then
             bfAuraOn = on
             if on then
                 task.spawn(function()
-                    local vu = game:GetService("VirtualUser")
                     while bfAuraOn do
                         pcall(function()
                             local hrp = GetHRP()
-                            if not hrp then return end
-                            local nearest, nearestDist = nil, bfAuraRange
-                            for _, obj in ipairs(Workspace:GetDescendants()) do
-                                if obj:IsA("Humanoid") and obj.Health > 0 then
-                                    local rp = obj.Parent and obj.Parent:FindFirstChild("HumanoidRootPart")
-                                    if rp and not Players:GetPlayerFromCharacter(obj.Parent)
-                                       and rp.Position.Y < 5000 then
-                                        local dist = (hrp.Position - rp.Position).Magnitude
-                                        if dist < nearestDist then
-                                            nearestDist = dist
-                                            nearest = rp
-                                        end
-                                    end
-                                end
-                            end
-                            if nearest then
-                                hrp.CFrame = nearest.CFrame * CFrame.new(0,0,3)
-                                task.wait(0.05)
-                                local sp = Camera:WorldToScreenPoint(nearest.Position)
-                                vu:Button1Down(Vector2.new(sp.X, sp.Y), Camera.CFrame)
-                                task.wait(0.08)
-                                vu:Button1Up(Vector2.new(sp.X, sp.Y), Camera.CFrame)
-                            end
+                            if hrp then AttackNearest(hrp, bfAuraRange) end
                         end)
-                        task.wait(0.15)
+                        task.wait(0.2)
                     end
                 end)
             end
@@ -814,7 +1020,7 @@ if DetectedGame == "Blox Fruits" then
         Callback = function(v) bfAuraRange = v end
     })
 
-    -- Fruit Sniper
+    -- Fruits
     BFTab:AddSection({ Name = "Fruits" })
 
     BFTab:AddButton({
@@ -826,53 +1032,46 @@ if DetectedGame == "Blox Fruits" then
                 local closest, closestDist = nil, math.huge
                 for _, obj in ipairs(Workspace:GetDescendants()) do
                     if obj:IsA("Model") and obj:FindFirstChild("Handle") and
-                       (obj.Name:find("Fruit") or obj.Name:find("fruit") or obj.Name:find("Devil")) then
+                       (obj.Name:find("[Ff]ruit") or obj.Name:find("[Dd]evil")) then
                         local pos = obj:GetPivot().Position
                         local dist = (hrp.Position - pos).Magnitude
-                        if dist < closestDist then
-                            closestDist = dist
-                            closest = pos
-                        end
+                        if dist < closestDist then closestDist = dist; closest = pos end
                     end
                 end
                 if closest then
-                    hrp.CFrame = CFrame.new(closest + Vector3.new(0,3,0))
-                    OrionLib:MakeNotification({ Name = "Fruit Sniper", Content = "Fruit found! " .. math.floor(closestDist) .. " studs", Image = ICON, Time = 3 })
+                    SafeTP(CFrame.new(closest + Vector3.new(0,3,0)))
+                    OrionLib:MakeNotification({ Name = "Fruit", Content = "Found! " .. math.floor(closestDist) .. "st", Image = ICON, Time = 3 })
                 else
-                    OrionLib:MakeNotification({ Name = "Fruit Sniper", Content = "No fruit nearby.", Image = ICON, Time = 3 })
+                    OrionLib:MakeNotification({ Name = "Fruit", Content = "No fruit found.", Image = ICON, Time = 3 })
                 end
             end)
         end
     })
 
     -- Island Teleport
-    BFTab:AddSection({ Name = "Teleport" })
+    BFTab:AddSection({ Name = "Islands" })
 
     local bfIslands = {
-        ["Spawn Island"]    = CFrame.new(977, 14, 1430),
-        ["Marine Fortress"] = CFrame.new(-1640, 9, 512),
-        ["Jungle"]          = CFrame.new(-150, 12, 1560),
-        ["Pirate Village"]  = CFrame.new(-1410, 8, -400),
-        ["Skylands"]        = CFrame.new(-5000, 600, -5000),
-        ["Middle Town"]     = CFrame.new(580, 8, 940),
+        ["Spawn Island"]    = CFrame.new(977,14,1430),
+        ["Marine Fortress"] = CFrame.new(-1640,9,512),
+        ["Jungle"]          = CFrame.new(-150,12,1560),
+        ["Pirate Village"]  = CFrame.new(-1410,8,-400),
+        ["Skylands"]        = CFrame.new(-5000,600,-5000),
+        ["Middle Town"]     = CFrame.new(580,8,940),
     }
 
+    local bfIslandList = {}
+    for k in pairs(bfIslands) do table.insert(bfIslandList, k) end
+    table.sort(bfIslandList)
+
     BFTab:AddDropdown({
-        Name = "Select Island", Default = "Spawn Island",
-        Options = (function()
-            local list = {}
-            for k in pairs(bfIslands) do table.insert(list, k) end
-            table.sort(list)
-            return list
-        end)(),
+        Name = "Select Island", Default = bfIslandList[1],
+        Options = bfIslandList,
         Callback = function(v)
-            pcall(function()
-                local hrp = GetHRP()
-                if hrp and bfIslands[v] then
-                    hrp.CFrame = bfIslands[v]
-                    OrionLib:MakeNotification({ Name = "Teleport", Content = v, Image = ICON, Time = 2 })
-                end
-            end)
+            if bfIslands[v] then
+                SafeTP(bfIslands[v])
+                OrionLib:MakeNotification({ Name = "TP", Content = v, Image = ICON, Time = 2 })
+            end
         end
     })
 
@@ -881,7 +1080,7 @@ if DetectedGame == "Blox Fruits" then
 
     local bfQuestOn = false
     BFTab:AddToggle({
-        Name = "Auto Quest (click quest giver)", Default = false,
+        Name = "Auto Quest (TP to quest giver)", Default = false,
         Callback = function(on)
             bfQuestOn = on
             if on then
@@ -889,14 +1088,9 @@ if DetectedGame == "Blox Fruits" then
                     while bfQuestOn do
                         pcall(function()
                             for _, npc in ipairs(Workspace:GetDescendants()) do
-                                if npc:IsA("Model") and (npc.Name:find("Quest") or npc.Name:find("quest")) then
+                                if npc:IsA("Model") and npc.Name:lower():find("quest") then
                                     local root = npc:FindFirstChild("HumanoidRootPart")
-                                    if root then
-                                        local hrp = GetHRP()
-                                        if hrp then
-                                            hrp.CFrame = root.CFrame * CFrame.new(0,0,5)
-                                        end
-                                    end
+                                    if root then SafeTP(root.CFrame * CFrame.new(0,0,5)) end
                                 end
                             end
                         end)
@@ -907,7 +1101,7 @@ if DetectedGame == "Blox Fruits" then
         end
     })
 
-end -- end Blox Fruits
+end -- Blox Fruits
 
 -- =============================================================================
 -- JJK ZERO TAB
@@ -919,7 +1113,7 @@ if DetectedGame == "JJK Zero" then
 
     JJKTab:AddSection({ Name = "Auto Farm" })
 
-    local jjkFarmOn = false
+    local jjkFarmOn    = false
     local jjkFarmRange = 30
 
     JJKTab:AddToggle({
@@ -928,35 +1122,12 @@ if DetectedGame == "JJK Zero" then
             jjkFarmOn = on
             if on then
                 task.spawn(function()
-                    local vu = game:GetService("VirtualUser")
                     while jjkFarmOn do
                         pcall(function()
                             local hrp = GetHRP()
-                            if not hrp then return end
-                            local nearest, nearestDist = nil, jjkFarmRange
-                            for _, hum in ipairs(Workspace:GetDescendants()) do
-                                if hum:IsA("Humanoid") and hum.Health > 0
-                                   and not Players:GetPlayerFromCharacter(hum.Parent) then
-                                    local rp = hum.Parent:FindFirstChild("HumanoidRootPart")
-                                    if rp and rp.Position.Y < 5000 then
-                                        local dist = (hrp.Position - rp.Position).Magnitude
-                                        if dist < nearestDist then
-                                            nearestDist = dist
-                                            nearest = rp
-                                        end
-                                    end
-                                end
-                            end
-                            if nearest then
-                                hrp.CFrame = nearest.CFrame * CFrame.new(0,0,3)
-                                task.wait(0.05)
-                                local sp = Camera:WorldToScreenPoint(nearest.Position)
-                                vu:Button1Down(Vector2.new(sp.X, sp.Y), Camera.CFrame)
-                                task.wait(0.08)
-                                vu:Button1Up(Vector2.new(sp.X, sp.Y), Camera.CFrame)
-                            end
+                            if hrp then AttackNearest(hrp, jjkFarmRange) end
                         end)
-                        task.wait(0.15)
+                        task.wait(0.25)
                     end
                 end)
             end
@@ -971,67 +1142,38 @@ if DetectedGame == "JJK Zero" then
 
     JJKTab:AddSection({ Name = "Combat" })
 
-    local jjkAutoSkillOn = false
-    local jjkSkillConn = nil
-
+    local jjkAuraOn = false
     JJKTab:AddToggle({
-        Name = "Auto Attack / Skill Spam", Default = false,
+        Name = "Auto Attack (M1 spam on target)", Default = false,
         Callback = function(on)
-            jjkAutoSkillOn = on
-            if jjkSkillConn then jjkSkillConn:Disconnect(); jjkSkillConn = nil end
-            if on then
-                jjkSkillConn = RunService.Heartbeat:Connect(function()
-                    pcall(function()
-                        local vu = game:GetService("VirtualUser")
-                        vu:Button1Down(Vector2.new(Mouse.X, Mouse.Y), Camera.CFrame)
-                        task.wait(0.05)
-                        vu:Button1Up(Vector2.new(Mouse.X, Mouse.Y), Camera.CFrame)
-                    end)
-                end)
-            end
-        end
-    })
-
-    JJKTab:AddToggle({
-        Name = "Auto Dash (Z-key spam)", Default = false,
-        Callback = function(on)
+            jjkAuraOn = on
             if on then
                 task.spawn(function()
-                    while jjkAutoSkillOn or on do
+                    while jjkAuraOn do
                         pcall(function()
                             local vu = game:GetService("VirtualUser")
-                            vu:KeyDown("z")
-                            task.wait(0.05)
-                            vu:KeyUp("z")
+                            vu:Button1Down(Vector2.new(Mouse.X, Mouse.Y), Camera.CFrame)
+                            task.wait(0.06)
+                            vu:Button1Up(Vector2.new(Mouse.X, Mouse.Y), Camera.CFrame)
                         end)
-                        task.wait(0.15)
-                        if not on then break end
+                        task.wait(0.12)
                     end
                 end)
             end
         end
     })
 
-    JJKTab:AddSection({ Name = "Stats" })
-
     JJKTab:AddToggle({
-        Name = "Infinite Cursed Energy (Mana Lock)", Default = false,
+        Name = "Auto Dash (Z-spam)", Default = false,
         Callback = function(on)
             if on then
                 task.spawn(function()
                     while on do
                         pcall(function()
-                            local char = LP.Character
-                            if char then
-                                for _, v in ipairs(char:GetDescendants()) do
-                                    if (v.Name:lower():find("mana") or v.Name:lower():find("energy")
-                                        or v.Name:lower():find("cursed")) and v:IsA("NumberValue") then
-                                        v.Value = v.Value + 9999
-                                    end
-                                end
-                            end
+                            local vu = game:GetService("VirtualUser")
+                            vu:KeyDown("z"); task.wait(0.05); vu:KeyUp("z")
                         end)
-                        task.wait(0.1)
+                        task.wait(0.15)
                         if not on then break end
                     end
                 end)
@@ -1042,7 +1184,7 @@ if DetectedGame == "JJK Zero" then
     JJKTab:AddSection({ Name = "Teleport" })
 
     JJKTab:AddButton({
-        Name = "Teleport to nearest Mob",
+        Name = "TP to nearest Mob",
         Callback = function()
             pcall(function()
                 local hrp = GetHRP()
@@ -1051,21 +1193,19 @@ if DetectedGame == "JJK Zero" then
                 for _, h in ipairs(Workspace:GetDescendants()) do
                     if h:IsA("Humanoid") and h.Health > 0 and not Players:GetPlayerFromCharacter(h.Parent) then
                         local rp = h.Parent:FindFirstChild("HumanoidRootPart")
-                        if rp then
+                        if rp and rp.Position.Y < 5000 then
                             local d = (hrp.Position - rp.Position).Magnitude
                             if d < closest then closest = d; closestPos = rp.CFrame end
                         end
                     end
                 end
-                if closestPos then
-                    hrp.CFrame = closestPos * CFrame.new(0,0,4)
-                end
+                if closestPos then SafeTP(closestPos * CFrame.new(0,0,4)) end
             end)
         end
     })
 
     JJKTab:AddButton({
-        Name = "Teleport to random Player",
+        Name = "TP to random Player",
         Callback = function()
             pcall(function()
                 local list = {}
@@ -1074,16 +1214,13 @@ if DetectedGame == "JJK Zero" then
                 end
                 if #list == 0 then return end
                 local target = list[math.random(1, #list)]
-                local hrp = GetHRP()
                 local tHrp = target.Character:FindFirstChild("HumanoidRootPart")
-                if hrp and tHrp then
-                    hrp.CFrame = tHrp.CFrame * CFrame.new(4,0,0)
-                end
+                if tHrp then SafeTP(tHrp.CFrame * CFrame.new(4,0,0)) end
             end)
         end
     })
 
-end -- end JJK Zero
+end -- JJK Zero
 
 -- =============================================================================
 -- WORLD ZERO TAB
@@ -1095,7 +1232,7 @@ if DetectedGame == "World Zero" then
 
     WZTab:AddSection({ Name = "Auto Farm" })
 
-    local wzFarmOn = false
+    local wzFarmOn    = false
     local wzAuraRange = 25
 
     WZTab:AddToggle({
@@ -1104,35 +1241,12 @@ if DetectedGame == "World Zero" then
             wzFarmOn = on
             if on then
                 task.spawn(function()
-                    local vu = game:GetService("VirtualUser")
                     while wzFarmOn do
                         pcall(function()
                             local hrp = GetHRP()
-                            if not hrp then return end
-                            local nearest, nearestDist = nil, wzAuraRange
-                            for _, h in ipairs(Workspace:GetDescendants()) do
-                                if h:IsA("Humanoid") and h.Health > 0
-                                   and not Players:GetPlayerFromCharacter(h.Parent) then
-                                    local rp = h.Parent:FindFirstChild("HumanoidRootPart")
-                                    if rp and rp.Position.Y < 5000 then
-                                        local dist = (hrp.Position - rp.Position).Magnitude
-                                        if dist < nearestDist then
-                                            nearestDist = dist
-                                            nearest = rp
-                                        end
-                                    end
-                                end
-                            end
-                            if nearest then
-                                hrp.CFrame = nearest.CFrame * CFrame.new(0,0,3)
-                                task.wait(0.05)
-                                local sp = Camera:WorldToScreenPoint(nearest.Position)
-                                vu:Button1Down(Vector2.new(sp.X, sp.Y), Camera.CFrame)
-                                task.wait(0.08)
-                                vu:Button1Up(Vector2.new(sp.X, sp.Y), Camera.CFrame)
-                            end
+                            if hrp then AttackNearest(hrp, wzAuraRange) end
                         end)
-                        task.wait(0.15)
+                        task.wait(0.25)
                     end
                 end)
             end
@@ -1152,7 +1266,6 @@ if DetectedGame == "World Zero" then
         Callback = function()
             task.spawn(function()
                 local count = 0
-                local vu = game:GetService("VirtualUser")
                 pcall(function()
                     local hrp = GetHRP()
                     if not hrp then return end
@@ -1161,14 +1274,9 @@ if DetectedGame == "World Zero" then
                            and not Players:GetPlayerFromCharacter(h.Parent) then
                             local rp = h.Parent:FindFirstChild("HumanoidRootPart")
                             if rp and rp.Position.Y < 5000 then
-                                hrp.CFrame = rp.CFrame * CFrame.new(0,0,3)
-                                task.wait(0.05)
-                                local sp = Camera:WorldToScreenPoint(rp.Position)
-                                vu:Button1Down(Vector2.new(sp.X, sp.Y), Camera.CFrame)
-                                task.wait(0.08)
-                                vu:Button1Up(Vector2.new(sp.X, sp.Y), Camera.CFrame)
-                                task.wait(0.1)
+                                AttackNearest(hrp, 999)
                                 count = count + 1
+                                task.wait(0.2)
                             end
                         end
                     end
@@ -1179,17 +1287,17 @@ if DetectedGame == "World Zero" then
     })
 
     WZTab:AddButton({
-        Name = "Teleport to Dungeon Center",
+        Name = "TP to Dungeon / Boss",
         Callback = function()
             pcall(function()
                 local hrp = GetHRP()
                 if hrp then
                     for _, obj in ipairs(Workspace:GetDescendants()) do
                         if obj.Name:lower():find("dungeon") or obj.Name:lower():find("boss") then
-                            local pos = obj:IsA("BasePart") and obj.Position or
-                                       (obj:IsA("Model") and obj:GetPivot().Position)
+                            local pos = obj:IsA("BasePart") and obj.Position
+                                or (obj:IsA("Model") and obj:GetPivot().Position)
                             if pos then
-                                hrp.CFrame = CFrame.new(pos + Vector3.new(0,5,0))
+                                SafeTP(CFrame.new(pos + Vector3.new(0,5,0)))
                                 break
                             end
                         end
@@ -1212,16 +1320,16 @@ if DetectedGame == "World Zero" then
                         if (obj:IsA("BasePart") or obj:IsA("Model")) and
                            (obj.Name:lower():find("loot") or obj.Name:lower():find("drop")
                             or obj.Name:lower():find("item") or obj.Name:lower():find("gem")) then
-                            local pos = obj:IsA("BasePart") and obj.Position or
-                                       (obj:IsA("Model") and obj:GetPivot().Position)
+                            local pos = obj:IsA("BasePart") and obj.Position
+                                or (obj:IsA("Model") and obj:GetPivot().Position)
                             if pos and (hrp.Position - pos).Magnitude < 200 then
-                                hrp.CFrame = CFrame.new(pos + Vector3.new(0,2,0))
+                                SafeTP(CFrame.new(pos + Vector3.new(0,2,0)))
                                 task.wait(0.1)
                             end
                         end
                     end
                 end)
-                OrionLib:MakeNotification({ Name = "Loot", Content = "Loot sweep done.", Image = ICON, Time = 2 })
+                OrionLib:MakeNotification({ Name = "Loot", Content = "Sweep done.", Image = ICON, Time = 2 })
             end)
         end
     })
@@ -1237,11 +1345,8 @@ if DetectedGame == "World Zero" then
                                 if p ~= LP and p.Character then
                                     local h = p.Character:FindFirstChildOfClass("Humanoid")
                                     if h and h.Health <= 0 then
-                                        local hrp = GetHRP()
                                         local tHrp = p.Character:FindFirstChild("HumanoidRootPart")
-                                        if hrp and tHrp then
-                                            hrp.CFrame = tHrp.CFrame * CFrame.new(0,0,3)
-                                        end
+                                        if tHrp then SafeTP(tHrp.CFrame * CFrame.new(0,0,3)) end
                                     end
                                 end
                             end
@@ -1254,7 +1359,7 @@ if DetectedGame == "World Zero" then
         end
     })
 
-end -- end World Zero
+end -- World Zero
 
 -- =============================================================================
 -- SETTINGS TAB
@@ -1283,11 +1388,15 @@ SettingsTab:AddButton({
     Callback = function()
         ClearEsp()
         StopFly()
-        if noclipConn then noclipConn:Disconnect() end
-        if ijConn then ijConn:Disconnect() end
-        if godConn then godConn:Disconnect() end
-        if fbConn then fbConn:Disconnect() end
-        if afkConn then afkConn:Disconnect() end
+        StopHover()
+        if noclipConn  then noclipConn:Disconnect()  end
+        if ijConn      then ijConn:Disconnect()       end
+        if godConn     then godConn:Disconnect()      end
+        if fbConn      then fbConn:Disconnect()       end
+        if afkConn     then afkConn:Disconnect()      end
+        statWalkSpeed = 16
+        statJumpPower = 50
+        statGravity   = 196
         Workspace.Gravity = 196
         OrionLib:Destroy()
     end
@@ -1299,15 +1408,19 @@ SettingsTab:AddButton({
 
 local CreditsTab = Window:MakeTab({ Name = "Credits", Icon = ICON, PremiumOnly = false })
 CreditsTab:AddSection({ Name = "Dev" })
-CreditsTab:AddLabel("Baddie404  -  v3.1")
+CreditsTab:AddLabel("Baddie404  -  v4.0")
 CreditsTab:AddLabel("Orion Library (jensonhirst fork)")
-CreditsTab:AddParagraph("Note", "Game-specific features only show in the correct game. Universal features work everywhere.")
+CreditsTab:AddParagraph("Changes v4.0",
+    "Sliders now persistent (WalkSpeed/Jump survive respawn). "
+    .. "Player-TP is a dropdown. Hover mode added. Kill Aura has 3-method attack. "
+    .. "SafeTP sets CFrame 3x. Coords TP added.")
 
 -- =============================================================================
--- CHARACTER RESPAWN HANDLER
+-- RESPAWN HANDLER
 -- =============================================================================
 
 LP.CharacterAdded:Connect(function(newChar)
+    -- Re-apply inf jump
     if InfJump then
         local h = newChar:WaitForChild("Humanoid")
         if ijConn then ijConn:Disconnect(); ijConn = nil end
@@ -1316,15 +1429,96 @@ LP.CharacterAdded:Connect(function(newChar)
                 task.wait(0.05)
                 pcall(function()
                     local hrp = newChar:FindFirstChild("HumanoidRootPart")
-                    if hrp then hrp.Velocity = Vector3.new(hrp.Velocity.X, GetHum().JumpPower or 50, hrp.Velocity.Z) end
+                    if hrp then hrp.Velocity = Vector3.new(hrp.Velocity.X, statJumpPower, hrp.Velocity.Z) end
                 end)
             end
         end)
     end
-    if FlyEnabled then
+    -- Re-apply fly
+    if FlyEnabled then task.wait(0.5); StartFly() end
+    -- Re-apply hover
+    if HoverOn then
+        if hoverConn then hoverConn:Disconnect(); hoverConn = nil end
+        if hoverBP then pcall(function() hoverBP:Destroy() end); hoverBP = nil end
         task.wait(0.5)
-        StartFly()
+        -- trigger re-attach by re-running the hover loop (HoverOn is still true)
     end
+    -- Force-apply stats immediately on spawn
+    task.wait(0.3)
+    pcall(function()
+        local h = newChar:FindFirstChildOfClass("Humanoid")
+        if h then
+            h.WalkSpeed  = statWalkSpeed
+            h.UseJumpPower = true
+            h.JumpPower  = statJumpPower
+        end
+        Workspace.Gravity = statGravity
+    end)
+end)
+
+-- =============================================================================
+-- CUSTOM DRAG (makes hub draggable on mobile/Delta)
+-- =============================================================================
+
+task.spawn(function()
+    task.wait(2) -- wait for Orion to create its GUI
+    pcall(function()
+        local OrionGui = CoreGui:FindFirstChild("Orion")
+        if not OrionGui then return end
+        -- Find the main window frame (first Frame that is large enough)
+        local mainFrame = nil
+        for _, v in ipairs(OrionGui:GetDescendants()) do
+            if v:IsA("Frame") and v.AbsoluteSize.X > 200 and v.AbsoluteSize.Y > 100 then
+                mainFrame = v
+                break
+            end
+        end
+        if not mainFrame then return end
+
+        -- Find title bar (top strip)
+        local dragBar = nil
+        for _, v in ipairs(mainFrame:GetChildren()) do
+            if v:IsA("Frame") and v.AbsoluteSize.Y < 60 and v.AbsoluteSize.Y > 10 then
+                dragBar = v
+                break
+            end
+        end
+        local dragTarget = dragBar or mainFrame
+
+        -- Drag logic (works touch + mouse)
+        local dragging = false
+        local dragStart, startPos
+
+        local function onInput(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1
+               or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                startPos = mainFrame.Position
+            end
+        end
+
+        local function onRelease(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1
+               or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end
+
+        local function onMove(input)
+            if dragging then
+                local delta = input.Position - dragStart
+                mainFrame.Position = UDim2.new(
+                    startPos.X.Scale, startPos.X.Offset + delta.X,
+                    startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                )
+            end
+        end
+
+        dragTarget.InputBegan:Connect(onInput)
+        UserInputService.InputEnded:Connect(onRelease)
+        UserInputService.InputChanged:Connect(onMove)
+    end)
 end)
 
 -- =============================================================================
@@ -1346,9 +1540,9 @@ OrionLib:Init()
 
 task.wait(0.8)
 OrionLib:MakeNotification({
-    Name = "Loaded",
+    Name    = "Loaded v4.0",
     Content = Universal
         and ("Universal Mode  -  PlaceId " .. tostring(PlaceId))
-        or  (DetectedGame .. " detected  -  all features active"),
+        or  (DetectedGame .. " detected - all features active"),
     Image = ICON, Time = 5
 })
