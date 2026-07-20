@@ -118,7 +118,7 @@ end
 -- ORION LADEN
 -- =============================================================================
 
--- safeGet: kompatibler HTTP-Wrapper für alle Executer (Delta, Fluxus, Synapse X, etc.)
+-- safeGet: kompatibler HTTP-Wrapper fuer alle Executer (Delta, Fluxus, Synapse X, etc.)
 -- Mobile Executer wie Delta blockieren game:HttpGet direkt, stellen aber
 -- 'request' oder 'http_request' als globale Funktion bereit.
 -- Wir probieren alle drei Methoden der Reihe nach.
@@ -128,7 +128,7 @@ local function safeGet(url)
         local res = request({ Url = url, Method = "GET" })
         return res.Body
     elseif http_request then
-        -- Synapse X, ältere Executer
+        -- Synapse X, aeltere Executer
         local res = http_request({ Url = url, Method = "GET" })
         return res.Body
     elseif syn and syn.request then
@@ -151,14 +151,14 @@ local ok, err = pcall(function()
 end)
 
 if not ok or type(OrionLib) ~= "table" then
-    SetStatus("Fehler – versuche Fallback...")
+    SetStatus("Fehler - versuche Fallback...")
     SetProgress(30, 0.3)
     task.wait(0.5)
     local ok2, err2 = pcall(function()
         OrionLib = loadstring(safeGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
     end)
     if not ok2 or type(OrionLib) ~= "table" then
-        SetStatus("Laden fehlgeschlagen – check deine Verbindung")
+        SetStatus("Laden fehlgeschlagen - check deine Verbindung")
         SetProgress(100, 0.3)
         task.wait(3)
         LoadGui:Destroy()
@@ -236,12 +236,12 @@ HomeTab:AddSection({ Name = "Misc" })
 HomeTab:AddButton({
     Name = "Notification testen",
     Callback = function()
-        OrionLib:MakeNotification({ Name = "Test", Content = "Alles läuft.", Image = ICON, Time = 3 })
+        OrionLib:MakeNotification({ Name = "Test", Content = "Alles laeuft.", Image = ICON, Time = 3 })
     end
 })
 
 -- =============================================================================
--- PLAYER TAB  (funktioniert überall)
+-- PLAYER TAB  (funktioniert ueberall)
 -- =============================================================================
 
 local PlayerTab = Window:MakeTab({ Name = "Player", Icon = ICON, PremiumOnly = false })
@@ -258,7 +258,7 @@ local function GetHRP()
     return char:FindFirstChild("HumanoidRootPart")
 end
 
--- ── Bewegung ──────────────────────────────────────
+-- -- Bewegung --------------------------------------
 PlayerTab:AddSection({ Name = "Bewegung" })
 
 PlayerTab:AddSlider({
@@ -289,7 +289,7 @@ PlayerTab:AddSlider({
     end
 })
 
--- ── Inf Jump ──────────────────────────────────────
+-- -- Inf Jump --------------------------------------
 local InfJump = false
 local ijConn = nil
 
@@ -316,7 +316,7 @@ PlayerTab:AddToggle({
     end
 })
 
--- ── Fly ───────────────────────────────────────────
+-- -- Fly -------------------------------------------
 local FlyEnabled = false
 local flySpeed = 60
 local flyConn, flyBV, flyBG
@@ -379,7 +379,7 @@ PlayerTab:AddSlider({
     Callback = function(v) flySpeed = v end
 })
 
--- ── Noclip ────────────────────────────────────────
+-- -- Noclip ----------------------------------------
 local NoclipOn = false
 local noclipConn = nil
 
@@ -413,7 +413,7 @@ PlayerTab:AddToggle({
     end
 })
 
--- ── Sicht & Umgebung ──────────────────────────────
+-- -- Sicht & Umgebung ------------------------------
 PlayerTab:AddSection({ Name = "Sicht & Umgebung" })
 
 -- Fullbright
@@ -449,7 +449,7 @@ PlayerTab:AddToggle({
 -- FOV Slider
 PlayerTab:AddSlider({
     Name = "FOV", Min = 30, Max = 120, Default = 70,
-    Color = Color3.fromRGB(255,200,80), Increment = 1, ValueName = "°",
+    Color = Color3.fromRGB(255,200,80), Increment = 1, ValueName = "deg",
     Callback = function(v) Camera.FieldOfView = v end
 })
 
@@ -462,7 +462,7 @@ PlayerTab:AddSlider({
     end
 })
 
--- ── Charakter ─────────────────────────────────────
+-- -- Charakter -------------------------------------
 PlayerTab:AddSection({ Name = "Charakter" })
 
 -- Anti-AFK
@@ -694,16 +694,16 @@ EspTab:AddToggle({
 
 EspTab:AddDropdown({
     Name = "ESP Farbe", Default = "Rot",
-    Options = {"Rot","Grün","Blau","Gelb","Weiß","Cyan"},
+    Options = {"Rot","Gruen","Blau","Gelb","Weiss","Cyan"},
     Callback = function(v)
-        local m = {["Rot"]=Color3.fromRGB(255,50,50),["Grün"]=Color3.fromRGB(50,255,80),
+        local m = {["Rot"]=Color3.fromRGB(255,50,50),["Gruen"]=Color3.fromRGB(50,255,80),
             ["Blau"]=Color3.fromRGB(60,130,255),["Gelb"]=Color3.fromRGB(255,220,30),
-            ["Weiß"]=Color3.fromRGB(255,255,255),["Cyan"]=Color3.fromRGB(0,230,230)}
+            ["Weiss"]=Color3.fromRGB(255,255,255),["Cyan"]=Color3.fromRGB(0,230,230)}
         EspColor = m[v] or Color3.fromRGB(255,50,50)
     end
 })
 
--- Spieler-Events für ESP
+-- Spieler-Events fuer ESP
 Players.PlayerAdded:Connect(function(p)
     if EspOn then
         p.CharacterAdded:Connect(function() task.wait(0.5); MakeBox(p) end)
@@ -742,7 +742,7 @@ if DetectedGame == "Blox Fruits" then
 
     local BFTab = Window:MakeTab({ Name = "Blox Fruits", Icon = ICON, PremiumOnly = false })
 
-    -- ── Auto Farm ────────────────────────────────────
+    -- -- Auto Farm ------------------------------------
     BFTab:AddSection({ Name = "Auto Farm" })
 
     local bfFarmOn = false
@@ -750,7 +750,7 @@ if DetectedGame == "Blox Fruits" then
     local bfFarmRange = 40
 
     BFTab:AddToggle({
-        Name = "Auto Farm (nächster Mob)", Default = false,
+        Name = "Auto Farm (naechster Mob)", Default = false,
         Callback = function(on)
             bfFarmOn = on
             if bfFarmConn then bfFarmConn:Disconnect(); bfFarmConn = nil end
@@ -761,7 +761,7 @@ if DetectedGame == "Blox Fruits" then
                         if not hrp then return end
                         local closest, closestDist = nil, bfFarmRange
 
-                        -- Suche alle Mobs (Humanoids die nicht LP gehören)
+                        -- Suche alle Mobs (Humanoids die nicht LP gehoeren)
                         for _, obj in ipairs(Workspace:GetDescendants()) do
                             if obj:IsA("Humanoid") and obj.Health > 0 then
                                 local rootPart = obj.Parent and obj.Parent:FindFirstChild("HumanoidRootPart")
@@ -791,7 +791,7 @@ if DetectedGame == "Blox Fruits" then
         Callback = function(v) bfFarmRange = v end
     })
 
-    -- ── Kill Aura ────────────────────────────────────
+    -- -- Kill Aura ------------------------------------
     BFTab:AddSection({ Name = "Combat" })
 
     local bfAuraOn = false
@@ -804,7 +804,7 @@ if DetectedGame == "Blox Fruits" then
             bfAuraOn = on
             if bfAuraConn then bfAuraConn:Disconnect(); bfAuraConn = nil end
             if on then
-                -- Throttled loop statt Heartbeat — verhindert 50k-Y-Spam und Server-Desync
+                -- Throttled loop statt Heartbeat - verhindert 50k-Y-Spam und Server-Desync
                 task.spawn(function()
                     local vu = game:GetService("VirtualUser")
                     while bfAuraOn do
@@ -816,7 +816,7 @@ if DetectedGame == "Blox Fruits" then
                                 if obj:IsA("Humanoid") and obj.Health > 0 then
                                     local rp = obj.Parent and obj.Parent:FindFirstChild("HumanoidRootPart")
                                     if rp and not Players:GetPlayerFromCharacter(obj.Parent)
-                                       and rp.Position.Y < 5000 then  -- Y-Guard: glitchte NPCs überspringen
+                                       and rp.Position.Y < 5000 then  -- Y-Guard: glitchte NPCs ueberspringen
                                         local dist = (hrp.Position - rp.Position).Magnitude
                                         if dist < nearestDist then
                                             nearestDist = dist
@@ -848,18 +848,18 @@ if DetectedGame == "Blox Fruits" then
         Callback = function(v) bfAuraRange = v end
     })
 
-    -- ── Fruit Sniper ─────────────────────────────────
-    BFTab:AddSection({ Name = "Früchte" })
+    -- -- Fruit Sniper ---------------------------------
+    BFTab:AddSection({ Name = "Fruechte" })
 
     BFTab:AddButton({
-        Name = "Zu nächster Frucht teleportieren",
+        Name = "Zu naechster Frucht teleportieren",
         Callback = function()
             pcall(function()
                 local hrp = GetHRP()
                 if not hrp then return end
                 local closest, closestDist = nil, math.huge
 
-                -- Blox Fruits speichert Früchte als Models mit bestimmten Namen
+                -- Blox Fruits speichert Fruechte als Models mit bestimmten Namen
                 for _, obj in ipairs(Workspace:GetDescendants()) do
                     if obj:IsA("Model") and obj:FindFirstChild("Handle") and
                        (obj.Name:find("Fruit") or obj.Name:find("fruit") or obj.Name:find("Devil")) then
@@ -876,16 +876,16 @@ if DetectedGame == "Blox Fruits" then
                     hrp.CFrame = CFrame.new(closest + Vector3.new(0,3,0))
                     OrionLib:MakeNotification({ Name = "Fruit Sniper", Content = "Frucht gefunden! " .. math.floor(closestDist) .. " studs", Image = ICON, Time = 3 })
                 else
-                    OrionLib:MakeNotification({ Name = "Fruit Sniper", Content = "Keine Frucht in der Nähe.", Image = ICON, Time = 3 })
+                    OrionLib:MakeNotification({ Name = "Fruit Sniper", Content = "Keine Frucht in der Naehe.", Image = ICON, Time = 3 })
                 end
             end)
         end
     })
 
-    -- ── Teleport zu Insel ────────────────────────────
+    -- -- Teleport zu Insel ----------------------------
     BFTab:AddSection({ Name = "Teleport" })
 
-    -- Bekannte Blox Fruits Inseln (ungefähre Koordinaten)
+    -- Bekannte Blox Fruits Inseln (ungefaehre Koordinaten)
     local bfIslands = {
         ["Spawn Island"]        = CFrame.new(977, 14, 1430),
         ["Marine Fortress"]     = CFrame.new(-1640, 9, 512),
@@ -896,7 +896,7 @@ if DetectedGame == "Blox Fruits" then
     }
 
     BFTab:AddDropdown({
-        Name = "Insel auswählen", Default = "Spawn Island",
+        Name = "Insel auswaehlen", Default = "Spawn Island",
         Options = (function()
             local list = {}
             for k in pairs(bfIslands) do table.insert(list, k) end
@@ -914,7 +914,7 @@ if DetectedGame == "Blox Fruits" then
         end
     })
 
-    -- ── Auto Quest ───────────────────────────────────
+    -- -- Auto Quest -----------------------------------
     BFTab:AddSection({ Name = "Quests" })
 
     local bfQuestOn = false
@@ -956,7 +956,7 @@ if DetectedGame == "JJK Zero" then
 
     local JJKTab = Window:MakeTab({ Name = "JJK Zero", Icon = ICON, PremiumOnly = false })
 
-    -- ── Auto Farm ────────────────────────────────────
+    -- -- Auto Farm ------------------------------------
     JJKTab:AddSection({ Name = "Auto Farm" })
 
     local jjkFarmOn = false
@@ -1012,7 +1012,7 @@ if DetectedGame == "JJK Zero" then
         Callback = function(v) jjkFarmRange = v end
     })
 
-    -- ── Combat ───────────────────────────────────────
+    -- -- Combat ---------------------------------------
     JJKTab:AddSection({ Name = "Combat" })
 
     -- Auto Skills (feuert Mouse1Click im Takt)
@@ -1059,7 +1059,7 @@ if DetectedGame == "JJK Zero" then
         end
     })
 
-    -- ── Cursed Energy Lock ───────────────────────────
+    -- -- Cursed Energy Lock ---------------------------
     JJKTab:AddSection({ Name = "Stats" })
 
     JJKTab:AddToggle({
@@ -1088,11 +1088,11 @@ if DetectedGame == "JJK Zero" then
         end
     })
 
-    -- ── Teleport ─────────────────────────────────────
+    -- -- Teleport -------------------------------------
     JJKTab:AddSection({ Name = "Teleport" })
 
     JJKTab:AddButton({
-        Name = "Zu nächstem Mob teleportieren",
+        Name = "Zu naechstem Mob teleportieren",
         Callback = function()
             pcall(function()
                 local hrp = GetHRP()
@@ -1115,7 +1115,7 @@ if DetectedGame == "JJK Zero" then
     })
 
     JJKTab:AddButton({
-        Name = "Zu zufälligem Spieler",
+        Name = "Zu zufaelligem Spieler",
         Callback = function()
             pcall(function()
                 local list = {}
@@ -1143,7 +1143,7 @@ if DetectedGame == "World Zero" then
 
     local WZTab = Window:MakeTab({ Name = "World Zero", Icon = ICON, PremiumOnly = false })
 
-    -- ── Auto Farm ────────────────────────────────────
+    -- -- Auto Farm ------------------------------------
     WZTab:AddSection({ Name = "Auto Farm" })
 
     local wzFarmOn = false
@@ -1199,7 +1199,7 @@ if DetectedGame == "World Zero" then
         Callback = function(v) wzAuraRange = v end
     })
 
-    -- ── Dungeon ───────────────────────────────────────
+    -- -- Dungeon ---------------------------------------
     WZTab:AddSection({ Name = "Dungeon" })
 
     WZTab:AddButton({
@@ -1255,7 +1255,7 @@ if DetectedGame == "World Zero" then
         end
     })
 
-    -- ── Auto Quest ───────────────────────────────────
+    -- -- Auto Quest -----------------------------------
     WZTab:AddSection({ Name = "Quests & Loot" })
 
     WZTab:AddButton({
@@ -1340,7 +1340,7 @@ SettingsTab:AddSection({ Name = "Hub" })
 SettingsTab:AddButton({
     Name = "Hub entladen",
     Callback = function()
-        -- Alles sauber aufräumen
+        -- Alles sauber aufraeumen
         ClearEsp()
         StopFly()
         if noclipConn then noclipConn:Disconnect() end
@@ -1359,9 +1359,9 @@ SettingsTab:AddButton({
 
 local CreditsTab = Window:MakeTab({ Name = "Credits", Icon = ICON, PremiumOnly = false })
 CreditsTab:AddSection({ Name = "Dev" })
-CreditsTab:AddLabel("Baddie404  –  v3.0")
+CreditsTab:AddLabel("Baddie404  -  v3.0")
 CreditsTab:AddLabel("Orion Library (jensonhirst fork)")
-CreditsTab:AddParagraph("Hinweis", "Alle game-spezifischen Features laufen nur im jeweiligen Spiel. Universal-Features gehen überall.")
+CreditsTab:AddParagraph("Hinweis", "Alle game-spezifischen Features laufen nur im jeweiligen Spiel. Universal-Features gehen ueberall.")
 
 -- =============================================================================
 -- CHARAKTER RESPAWN HANDLER
@@ -1410,7 +1410,7 @@ task.wait(0.8)
 OrionLib:MakeNotification({
     Name = "Geladen",
     Content = Universal
-        and ("Universal Modus  ·  PlaceId " .. tostring(PlaceId))
-        or  (DetectedGame .. " erkannt  ·  alle Features aktiv"),
+        and ("Universal Modus  .  PlaceId " .. tostring(PlaceId))
+        or  (DetectedGame .. " erkannt  .  alle Features aktiv"),
     Image = ICON, Time = 5
 })
