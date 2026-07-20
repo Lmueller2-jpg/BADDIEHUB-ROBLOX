@@ -804,21 +804,39 @@ if DetectedGame == "Blox Fruits" then
             bfAuraOn = on
             if bfAuraConn then bfAuraConn:Disconnect(); bfAuraConn = nil end
             if on then
-                bfAuraConn = RunService.Heartbeat:Connect(function()
-                    pcall(function()
-                        local hrp = GetHRP()
-                        if not hrp then return end
-                        for _, obj in ipairs(Workspace:GetDescendants()) do
-                            if obj:IsA("Humanoid") and obj.Health > 0 then
-                                local rp = obj.Parent:FindFirstChild("HumanoidRootPart")
-                                if rp and not Players:GetPlayerFromCharacter(obj.Parent) then
-                                    if (hrp.Position - rp.Position).Magnitude <= bfAuraRange then
-                                        obj.Health = 0
+                -- Throttled loop statt Heartbeat — verhindert 50k-Y-Spam und Server-Desync
+                task.spawn(function()
+                    local vu = game:GetService("VirtualUser")
+                    while bfAuraOn do
+                        pcall(function()
+                            local hrp = GetHRP()
+                            if not hrp then return end
+                            local nearest, nearestDist = nil, bfAuraRange
+                            for _, obj in ipairs(Workspace:GetDescendants()) do
+                                if obj:IsA("Humanoid") and obj.Health > 0 then
+                                    local rp = obj.Parent and obj.Parent:FindFirstChild("HumanoidRootPart")
+                                    if rp and not Players:GetPlayerFromCharacter(obj.Parent)
+                                       and rp.Position.Y < 5000 then  -- Y-Guard: glitchte NPCs überspringen
+                                        local dist = (hrp.Position - rp.Position).Magnitude
+                                        if dist < nearestDist then
+                                            nearestDist = dist
+                                            nearest = rp
+                                        end
                                     end
                                 end
                             end
-                        end
-                    end)
+                            if nearest then
+                                -- Teleport direkt daneben, dann VirtualUser M1-Click
+                                hrp.CFrame = nearest.CFrame * CFrame.new(0, 0, 3)
+                                task.wait(0.05)
+                                local sp = Camera:WorldToScreenPoint(nearest.Position)
+                                vu:Button1Down(Vector2.new(sp.X, sp.Y), Camera.CFrame)
+                                task.wait(0.08)
+                                vu:Button1Up(Vector2.new(sp.X, sp.Y), Camera.CFrame)
+                            end
+                        end)
+                        task.wait(0.15)
+                    end
                 end)
             end
         end
@@ -951,20 +969,38 @@ if DetectedGame == "JJK Zero" then
             jjkFarmOn = on
             if jjkFarmConn then jjkFarmConn:Disconnect(); jjkFarmConn = nil end
             if on then
-                jjkFarmConn = RunService.Heartbeat:Connect(function()
-                    pcall(function()
-                        local hrp = GetHRP()
-                        if not hrp then return end
-                        for _, hum in ipairs(Workspace:GetDescendants()) do
-                            if hum:IsA("Humanoid") and hum.Health > 0 and
-                               not Players:GetPlayerFromCharacter(hum.Parent) then
-                                local rp = hum.Parent:FindFirstChild("HumanoidRootPart")
-                                if rp and (hrp.Position - rp.Position).Magnitude < jjkFarmRange then
-                                    hum.Health = 0
+                -- VirtualUser M1-Click statt Health = 0 (verhindert 50k-Y-Fehler)
+                task.spawn(function()
+                    local vu = game:GetService("VirtualUser")
+                    while jjkFarmOn do
+                        pcall(function()
+                            local hrp = GetHRP()
+                            if not hrp then return end
+                            local nearest, nearestDist = nil, jjkFarmRange
+                            for _, hum in ipairs(Workspace:GetDescendants()) do
+                                if hum:IsA("Humanoid") and hum.Health > 0 and
+                                   not Players:GetPlayerFromCharacter(hum.Parent) then
+                                    local rp = hum.Parent:FindFirstChild("HumanoidRootPart")
+                                    if rp and rp.Position.Y < 5000 then  -- Y-Guard
+                                        local dist = (hrp.Position - rp.Position).Magnitude
+                                        if dist < nearestDist then
+                                            nearestDist = dist
+                                            nearest = rp
+                                        end
+                                    end
                                 end
                             end
-                        end
-                    end)
+                            if nearest then
+                                hrp.CFrame = nearest.CFrame * CFrame.new(0, 0, 3)
+                                task.wait(0.05)
+                                local sp = Camera:WorldToScreenPoint(nearest.Position)
+                                vu:Button1Down(Vector2.new(sp.X, sp.Y), Camera.CFrame)
+                                task.wait(0.08)
+                                vu:Button1Up(Vector2.new(sp.X, sp.Y), Camera.CFrame)
+                            end
+                        end)
+                        task.wait(0.15)
+                    end
                 end)
             end
         end
@@ -1120,20 +1156,38 @@ if DetectedGame == "World Zero" then
             wzFarmOn = on
             if wzFarmConn then wzFarmConn:Disconnect(); wzFarmConn = nil end
             if on then
-                wzFarmConn = RunService.Heartbeat:Connect(function()
-                    pcall(function()
-                        local hrp = GetHRP()
-                        if not hrp then return end
-                        for _, h in ipairs(Workspace:GetDescendants()) do
-                            if h:IsA("Humanoid") and h.Health > 0 and
-                               not Players:GetPlayerFromCharacter(h.Parent) then
-                                local rp = h.Parent:FindFirstChild("HumanoidRootPart")
-                                if rp and (hrp.Position - rp.Position).Magnitude <= wzAuraRange then
-                                    h.Health = 0
+                -- VirtualUser M1-Click + Y-Guard statt Health = 0
+                task.spawn(function()
+                    local vu = game:GetService("VirtualUser")
+                    while wzFarmOn do
+                        pcall(function()
+                            local hrp = GetHRP()
+                            if not hrp then return end
+                            local nearest, nearestDist = nil, wzAuraRange
+                            for _, h in ipairs(Workspace:GetDescendants()) do
+                                if h:IsA("Humanoid") and h.Health > 0 and
+                                   not Players:GetPlayerFromCharacter(h.Parent) then
+                                    local rp = h.Parent:FindFirstChild("HumanoidRootPart")
+                                    if rp and rp.Position.Y < 5000 then  -- Y-Guard
+                                        local dist = (hrp.Position - rp.Position).Magnitude
+                                        if dist < nearestDist then
+                                            nearestDist = dist
+                                            nearest = rp
+                                        end
+                                    end
                                 end
                             end
-                        end
-                    end)
+                            if nearest then
+                                hrp.CFrame = nearest.CFrame * CFrame.new(0, 0, 3)
+                                task.wait(0.05)
+                                local sp = Camera:WorldToScreenPoint(nearest.Position)
+                                vu:Button1Down(Vector2.new(sp.X, sp.Y), Camera.CFrame)
+                                task.wait(0.08)
+                                vu:Button1Up(Vector2.new(sp.X, sp.Y), Camera.CFrame)
+                            end
+                        end)
+                        task.wait(0.15)
+                    end
                 end)
             end
         end
@@ -1151,16 +1205,31 @@ if DetectedGame == "World Zero" then
     WZTab:AddButton({
         Name = "Dungeon Mobs killen (alle in Workspace)",
         Callback = function()
-            local count = 0
-            pcall(function()
-                for _, h in ipairs(Workspace:GetDescendants()) do
-                    if h:IsA("Humanoid") and h.Health > 0 and not Players:GetPlayerFromCharacter(h.Parent) then
-                        h.Health = 0
-                        count = count + 1
+            task.spawn(function()
+                local count = 0
+                local vu = game:GetService("VirtualUser")
+                pcall(function()
+                    local hrp = GetHRP()
+                    if not hrp then return end
+                    for _, h in ipairs(Workspace:GetDescendants()) do
+                        if h:IsA("Humanoid") and h.Health > 0
+                           and not Players:GetPlayerFromCharacter(h.Parent) then
+                            local rp = h.Parent:FindFirstChild("HumanoidRootPart")
+                            if rp and rp.Position.Y < 5000 then  -- Y-Guard
+                                hrp.CFrame = rp.CFrame * CFrame.new(0, 0, 3)
+                                task.wait(0.05)
+                                local sp = Camera:WorldToScreenPoint(rp.Position)
+                                vu:Button1Down(Vector2.new(sp.X, sp.Y), Camera.CFrame)
+                                task.wait(0.08)
+                                vu:Button1Up(Vector2.new(sp.X, sp.Y), Camera.CFrame)
+                                task.wait(0.1)
+                                count = count + 1
+                            end
+                        end
                     end
-                end
+                end)
+                OrionLib:MakeNotification({ Name = "Dungeon", Content = count .. " Mobs angegriffen.", Image = ICON, Time = 3 })
             end)
-            OrionLib:MakeNotification({ Name = "Dungeon", Content = count .. " Mobs gekillt.", Image = ICON, Time = 3 })
         end
     })
 
