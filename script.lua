@@ -228,24 +228,15 @@ local WindUI, Window
 local loaderSuccess, loaderErr = pcall(function()
     local source = game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua")
     WindUI = loadstring(source)()
-    Window = WindUI:CreateWindow({
+        Window = WindUI:CreateWindow({
         Title = "BADDIE404 MULTIHUB",
         Subtitle = DetectedGame .. " Mode",
         Author = "Baddie404 Team",
         Folder = "BaddieHub_Config",
         Size = UDim2.fromOffset(580, 460),
-        Transparent = true,
-        Theme = BaddieHubSettings.Theme
+        Transparent = true
     })
-    
-    if WindUI and WindUI.SetTheme then
-        pcall(function()
-            WindUI:SetTheme({
-                Accent = BaddieHubSettings.AccentColor
-            })
-        end)
-    end
-end)
+
 
 if not loaderSuccess or not WindUI or not Window then
     warn("[BaddieHub] WindUI Library failure: " .. tostring(loaderErr))
