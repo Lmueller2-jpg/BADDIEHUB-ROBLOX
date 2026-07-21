@@ -536,6 +536,141 @@ local Flying = false
 local FlySpeed = 50
 local FlyConnection
 
+local Noclipping = false
+local NoclipConnection
+local KillAura = false
+local KillAuraRange = 50
+local SilentAim = false
+local SilentAimFOV = 150
+local FOVCircle = nil
+
+pcall(function()
+    if Drawing and Drawing.new then
+        FOVCircle = Drawing.new("Circle")
+        FOVCircle.Thickness = 1.5
+        FOVCircle.Color = BaddieHubSettings.AccentColor
+        FOVCircle.Filled = false
+        FOVCircle.Transparency = 0.7
+        FOVCircle.Visible = false
+        FOVCircle.Radius = SilentAimFOV
+    end
+end)
+
+local function ToggleNoclip(state)
+    Noclipping = state
+    if NoclipConnection then 
+        pcall(function() NoclipConnection:Disconnect() end)
+        NoclipConnection = nil 
+    end
+    
+    if Noclipping then
+        NoclipConnection = RunService.Stepped:Connect(function()
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char then
+                    for _, part in ipairs(char:GetDescendants()) do
+                        if part:IsA("BasePart") and part.CanCollide then
+                            part.CanCollide = false
+                        end
+                    end
+                end
+            end)
+        end)
+        table.insert(Watchdog.Connections, NoclipConnection)
+    end
+end
+
+local function GetClosestTarget()
+    local closest = nil
+    local shortestDist = math.huge
+    local mousePos = UserInputService:GetMouseLocation()
+
+    -- Search players first
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChildOfClass("Humanoid") and player.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
+            local hrp = player.Character.HumanoidRootPart
+            local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+            if onScreen then
+                local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                if dist <= SilentAimFOV and dist < shortestDist then
+                    shortestDist = dist
+                    closest = player.Character
+                end
+            end
+        end
+    end
+
+    -- If no player, search NPCs/Enemies
+    if not closest then
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("Model") and obj:FindFirstChild("HumanoidRootPart") and obj:FindFirstChildOfClass("Humanoid") and obj:FindFirstChildOfClass("Humanoid").Health > 0 and not Players:GetPlayerFromCharacter(obj) then
+                local hrp = obj.HumanoidRootPart
+                local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                if onScreen then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    if dist <= SilentAimFOV and dist < shortestDist then
+                        shortestDist = dist
+                        closest = obj
+                    end
+                end
+            end
+        end
+    end
+
+    return closest
+end
+
+-- RenderStepped for FOVCircle Position update
+task.spawn(function()
+    local fovUpdateConn
+    fovUpdateConn = RunService.RenderStepped:Connect(function()
+        if FOVCircle then
+            if SilentAim then
+                local mousePos = UserInputService:GetMouseLocation()
+                FOVCircle.Position = Vector2.new(mousePos.X, mousePos.Y)
+                FOVCircle.Radius = SilentAimFOV
+                FOVCircle.Visible = true
+            else
+                FOVCircle.Visible = false
+            end
+        end
+    end)
+    table.insert(Watchdog.Connections, fovUpdateConn)
+end)
+
+-- KillAura Loop
+task.spawn(function()
+    while true do
+        if KillAura then
+            pcall(function()
+                local target = GetClosestTarget()
+                if target and target:FindFirstChild("HumanoidRootPart") then
+                    local hrp = GetHRP()
+                    if hrp then
+                        local dist = (hrp.Position - target.HumanoidRootPart.Position).Magnitude
+                        if dist <= KillAuraRange then
+                            local tool = EquipPreferredWeapon()
+                            if tool then
+                                tool:Activate()
+                                pcall(function()
+                                    local vu = game:GetService("VirtualUser")
+                                    vu:Button1Down(Vector2.new(0, 0), Camera.CFrame)
+                                    task.wait(0.01)
+                                    vu:Button1Up(Vector2.new(0, 0), Camera.CFrame)
+                                end)
+                                if PlaceId == 275391513 or PlaceId == 4442272121 or PlaceId == 7449423635 then -- Blox Fruits
+                                    ReplicatedStorage.Remotes.CommF:InvokeServer("Hit", 1)
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+        task.wait(0.1)
+    end
+end)
+
 local function ToggleFly(state)
     Flying = state
     local char = LocalPlayer.Character
@@ -834,6 +969,70 @@ HomeTab:Toggle({
     end
 })
 
+HomeTab:Toggle({
+    Title = "Toggle Noclip Protocol",
+    Desc = "Allows walking through solid objects, walls, and terrain.",
+    Value = false,
+    Callback = function(state)
+        ToggleNoclip(state)
+    end
+})
+
+HomeTab:Slider({
+    Title = "Workspace Gravity Shifter",
+    Desc = "Override physical world gravity. Set to 0 to float, default is 196.2.",
+    Min = 0,
+    Max = 300,
+    Value = 196,
+    Callback = function(val)
+        pcall(function()
+            workspace.Gravity = val
+        end)
+    end
+})
+
+HomeTab:Section({ Title = "Combat / Aimbot Systems" })
+
+HomeTab:Toggle({
+    Title = "Enable Combat Silent Aim",
+    Desc = "Redirects attacks and locks on players and NPCs in FOV.",
+    Value = false,
+    Callback = function(state)
+        SilentAim = state
+    end
+})
+
+HomeTab:Slider({
+    Title = "Aimbot FOV Range",
+    Desc = "Adjust the targeting boundary radius on your screen.",
+    Min = 30,
+    Max = 600,
+    Value = SilentAimFOV,
+    Callback = function(val)
+        SilentAimFOV = val
+    end
+})
+
+HomeTab:Toggle({
+    Title = "Enable Multi-Target Kill Aura",
+    Desc = "Rapidly hits and attacks the closest target automatically in range.",
+    Value = false,
+    Callback = function(state)
+        KillAura = state
+    end
+})
+
+HomeTab:Slider({
+    Title = "Kill Aura Range Limit",
+    Desc = "Maximum distance in studs to trigger rapid attacks.",
+    Min = 10,
+    Max = 150,
+    Value = KillAuraRange,
+    Callback = function(val)
+        KillAuraRange = val
+    end
+})
+
 -- [Tab B: ESP Hack Overlays]
 local EspTab = CreateTab("ESPs & Overlays", "eye")
 local EspEnabled = false
@@ -850,15 +1049,15 @@ local function ApplyESP(player)
         local hrp = char:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
         
-        -- Bounding Box Adornment
-        local box = Instance.new("BoxHandleAdornment")
-        box.Name = "BaddieESPBox"
-        box.Size = Vector3.new(4, 6, 4)
-        box.Color3 = BaddieHubSettings.AccentColor
-        box.AlwaysOnTop = true
-        box.ZIndex = 5
-        box.Adornee = hrp
-        box.Parent = EspFolder
+        -- Highlight ESP
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "BaddieHighlight"
+        highlight.FillColor = BaddieHubSettings.AccentColor
+        highlight.FillTransparency = 0.5
+        highlight.OutlineColor = Color3.new(1, 1, 1)
+        highlight.OutlineTransparency = 0
+        highlight.Adornee = char
+        highlight.Parent = EspFolder
         
         -- Overhead Billboard Title
         local billboard = Instance.new("BillboardGui")
@@ -889,7 +1088,7 @@ local function ApplyESP(player)
                 end
             else
                 if distConn then distConn:Disconnect() end
-                box:Destroy()
+                highlight:Destroy()
                 billboard:Destroy()
             end
         end)
@@ -1137,6 +1336,43 @@ TeleportTab:Button({
             local hrp = foundPlayer.Character:FindFirstChild("HumanoidRootPart")
             if hrp then
                 SafeTeleport(hrp.CFrame * CFrame.new(0, 3, 0))
+            end
+        else
+            pcall(function()
+                WindUI:Notify({
+                    Title = "Teleport Failed",
+                    Content = "Target player not found or character not active.",
+                    Duration = 3
+                })
+            end)
+        end
+    end
+})
+
+TeleportTab:Button({
+    Title = "Backstab TP (Behind Target)",
+    Desc = "Teleports behind the player to initiate surprise attacks.",
+    Callback = function()
+        local targetName = selectedPlayerTp
+        if targetPlayerInput ~= "" then
+            targetName = targetPlayerInput
+        end
+        
+        local foundPlayer = nil
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then
+                if p.Name == targetName or p.DisplayName == targetName or p.Name:lower():find(targetName:lower()) or p.DisplayName:lower():find(targetName:lower()) then
+                    foundPlayer = p
+                    break
+                end
+            end
+        end
+        
+        if foundPlayer and foundPlayer.Character then
+            local hrp = foundPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local backCFrame = hrp.CFrame * CFrame.new(0, 0, 3.5) * CFrame.Angles(0, math.pi, 0)
+                SafeTeleport(backCFrame)
             end
         else
             pcall(function()
@@ -1441,6 +1677,34 @@ if BaddieHubSettings.EnableBloxFruits and (DetectedGame == "Blox Fruits" or Univ
 
     BloxTab:Section({ Title = "World Fruits" })
     
+    local FruitVacuum = false
+    BloxTab:Toggle({
+        Title = "Auto Vacuum Dropped Fruits",
+        Desc = "Constantly scans the map, teleports you to any spawned devil fruit, collects it, and teleports back.",
+        Value = false,
+        Callback = function(state)
+            FruitVacuum = state
+            task.spawn(function()
+                while FruitVacuum do
+                    pcall(function()
+                        local hrp = GetHRP(); if not hrp then return end
+                        for _, o in ipairs(workspace:GetDescendants()) do
+                            if not FruitVacuum then break end
+                            if o:IsA("Tool") and (o.Name:lower():find("fruit") or o.Name:lower():find("devil")) then
+                                local handle = o:FindFirstChild("Handle") or o:FindFirstChildOfClass("BasePart")
+                                if handle then
+                                    SafeTeleport(handle.CFrame * CFrame.new(0, 3, 0))
+                                    task.wait(1.5)
+                                end
+                            end
+                        end
+                    end)
+                    task.wait(5)
+                end
+            end)
+        end
+    end)
+
     BloxTab:Button({
         Title = "TP to nearest World Devil Fruit",
         Desc = "Searches Workspace for dropped Devil Fruits and teleports safely.",
@@ -1464,7 +1728,35 @@ if BaddieHubSettings.EnableBloxFruits and (DetectedGame == "Blox Fruits" or Univ
                 end
             end)
         end
-    })
+    end)
+
+    BloxTab:Button({
+        Title = "Server Hop (Bypass Timers)",
+        Desc = "Teleports you to a different server instance to bypass quest/chest timers.",
+        Callback = function()
+            local x = game:GetService("HttpService")
+            local teleportService = game:GetService("TeleportService")
+            local placeId = game.PlaceId
+            local success, servers = pcall(function()
+                return x:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Asc&limit=100"))
+            end)
+            if success and servers and servers.data then
+                local serverList = {}
+                for _, s in ipairs(servers.data) do
+                    if s.playing < s.maxPlayers and s.id ~= game.JobId then
+                        table.insert(serverList, s.id)
+                    end
+                end
+                if #serverList > 0 then
+                    teleportService:TeleportToPlaceInstance(placeId, serverList[math.random(1, #serverList)])
+                else
+                    WindUI:Notify({Title = "Server Hop", Content = "No other suitable servers found.", Duration = 3})
+                end
+            else
+                WindUI:Notify({Title = "Server Hop", Content = "Failed to fetch server list.", Duration = 3})
+            end
+        end
+    end)
 
     BloxTab:Section({ Title = "Island Ports" })
     local bfIslands = {
