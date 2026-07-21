@@ -197,80 +197,154 @@ SetStatus("Validating Workspace Assets..."); SetProgress(55, 0.4); task.wait(0.5
 -- =============================================================================
 -- WINDUI BOOTSTRAPPER (Modern Touch-First Framework)
 -- =============================================================================
-local WindUI = nil
+SetStatus("Injecting Footagesus WindUI Assets..."); SetProgress(85, 0.2); task.wait(0.2)
+local WindUI, Window
 local loaderSuccess, loaderErr = pcall(function()
-    WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Baddie404/WindUI-Multihub/main/WindUI.lua"))()
+    local httpResponse = nil
+    local getSuccess, getErr = pcall(function()
+        if game.HttpGet then
+            httpResponse = game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua")
+        elseif HttpGet then
+            httpResponse = HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua")
+        end
+    end)
+    
+    if getSuccess and httpResponse and #httpResponse > 0 then
+        local loadFunc, loadErr = loadstring(httpResponse)
+        if loadFunc then
+            local runSuccess, runResult = pcall(loadFunc)
+            if runSuccess and runResult then
+                WindUI = runResult
+            else
+                error("WindUI execution error: " .. tostring(runResult or "unknown"))
+            end
+        else
+            error("WindUI compilation error: " .. tostring(loadErr or "unknown"))
+        end
+    else
+        error("WindUI fetch error: " .. tostring(getErr or "empty response"))
+    end
+
+    local Games = {
+        ["Blox Fruits"] = {275391513, 4442272121, 7449423635, 11349191060, 2753915549, 5261459311},
+        ["JJK Zero"]    = {7973578035, 8049346128, 7901843281},
+        ["World Zero"]  = {4157004456, 4616238637, 4616888069},
+    }
+    local DetectedGame = nil
+    for name, ids in pairs(Games) do
+        for _, id in ipairs(ids) do
+            if id == PlaceId then DetectedGame = name; break end
+        end
+        if DetectedGame then break end
+    end
+    
+    if not DetectedGame then
+        local success, info = pcall(function()
+            return MarketplaceService:GetProductInfo(PlaceId)
+        end)
+        if success and info then
+            local lowerName = info.Name:lower()
+            if lowerName:find("blox fruit") or lowerName:find("blox-fruit") then
+                DetectedGame = "Blox Fruits"
+            elseif lowerName:find("jjk") or lowerName:find("jujutsu") or lowerName:find("zero") and lowerName:find("jjk") then
+                DetectedGame = "JJK Zero"
+            elseif lowerName:find("world zero") or lowerName:find("world-zero") then
+                DetectedGame = "World Zero"
+            end
+        end
+    end
+    
+    if not DetectedGame then DetectedGame = "Universal" end
+
+    Window = WindUI:CreateWindow({
+        Title = "BADDIE404 MULTIHUB",
+        Subtitle = DetectedGame .. " Mode",
+        Author = "Baddie404 Team",
+        Folder = "BaddieHub_Config",
+        Size = UDim2.fromOffset(580, 460),
+        Transparent = true,
+        Theme = BaddieHubSettings.Theme
+    })
+    
+    if WindUI.SetTheme then
+        pcall(function()
+            WindUI:SetTheme({
+                Accent = BaddieHubSettings.AccentColor
+            })
+        end)
+    end
 end)
 
 if not loaderSuccess or not WindUI then
-    warn("[BaddieHub Bootstrapper] WindUI CDN load failed. Falling back to built-in fallback UI framework...")
-    WindUI = {
-        CreateWindow = function(_, opts)
-            print("[Fallback Window] Initiated: " .. tostring(opts.Title))
-            local dummy = {
-                Tab = function()
-                    local t = {}
-                    local dummyMethods = {"Section", "Button", "Toggle", "Slider", "Dropdown", "TextBox"}
-                    for _, m in ipairs(dummyMethods) do
-                        t[m] = function(_, o)
-                            print("[Fallback Control] Added " .. m .. " -> " .. tostring(o.Title or o.Value))
-                            if o.Callback then
-                                task.spawn(function() pcall(o.Callback, o.Value or o.Default or false) end)
-                            end
-                            return {
-                                Refresh = function() end,
-                                SetOptions = function() end,
-                                UpdateDropdown = function() end
-                            }
-                        end
-                    end
-                    return t
-                end,
-                Toggle = function() end,
-                Notify = function(_, o) print("[Notification] " .. tostring(o.Title) .. ": " .. tostring(o.Content)) end
-            }
-            return dummy
-        end,
-        Notify = function(_, o) print("[Notification] " .. tostring(o.Title) .. ": " .. tostring(o.Content)) end
-    }
+    warn("[BaddieHub] WindUI Library failure: " .. tostring(loaderErr))
+    SetStatus("Network block! Check Roblox executor."); SetProgress(100, 0.5); task.wait(2)
+    LoadGui:Destroy()
+    return
 end
 
-SetStatus("Bootstrapping WindUI Framework..."); SetProgress(85, 0.3); task.wait(0.3)
+SetStatus("Bootstrapping WindUI Framework..."); SetProgress(95, 0.2); task.wait(0.2)
 
-local Window = WindUI:CreateWindow({
-    Title = "BaddieHub Multi-Game",
-    SubTitle = "v5.1 Premium",
-    Icon = "rbxassetid://10723345484",
-    Theme = BaddieHubSettings.Theme,
-    Accent = BaddieHubSettings.AccentColor,
-    Size = UDim2.new(0, 560, 0, 380),
-    Transparent = true,
-    MinimizeKey = Enum.KeyCode.RightControl
-})
-
-local function CreateTab(name, icon)
-    local realTab = Window:Tab({ Title = name, Icon = icon or "box" })
+-- Compatibility helper to wrap any tab control methods dynamically using a safe proxy wrapper
+local function CreateTab(title, icon)
+    local realTab = nil
+    pcall(function()
+        realTab = Window:Tab({
+            Title = title,
+            Icon = icon or "grid"
+        })
+    end)
+    
+    -- We return a proxy table that intercepts all method calls
     local safeTab = {}
     
+    -- Define safety wrapper for adding elements
     local function wrapMethod(methodName)
-        return function(_, options, ...)
-            local method = realTab[methodName]
-            if not method then
-                warn("[BaddieHub Tabs] WindUI tab is missing method: " .. tostring(methodName))
+        return function(self, options, ...)
+            if not realTab then
+                warn("[BaddieHub SafeTab] Cannot call '" .. methodName .. "' because realTab is nil")
                 return nil
             end
             
-            -- Safe intercept/pcall execute wrapper
+            -- Find the actual method on the real tab
+            local method = realTab[methodName]
+            if not method then
+                -- Check alternative names
+                local alternatives = {
+                    Button = "AddButton", AddButton = "Button",
+                    Toggle = "AddToggle", AddToggle = "Toggle",
+                    Slider = "AddSlider", AddSlider = "Slider",
+                    Dropdown = "AddDropdown", AddDropdown = "Dropdown",
+                    TextBox = "AddTextbox", AddTextbox = "TextBox", AddTextBox = "TextBox", TextBox = "AddTextBox",
+                    Keybind = "AddKeybind", AddKeybind = "Keybind", AddBind = "Keybind", Bind = "Keybind",
+                    Section = "AddSection", AddSection = "Section"
+                }
+                local altName = alternatives[methodName]
+                if altName then
+                    method = realTab[altName]
+                end
+            end
+            
+            if not method then
+                warn("[BaddieHub SafeTab] Method '" .. methodName .. "' does not exist on tab")
+                return nil
+            end
+            
             local args = {...}
+            -- Call the method safely inside pcall
             local success, result = pcall(function()
                 return method(realTab, options, unpack(args))
             end)
             
             if not success then
-                warn("[BaddieHub Tabs] Error executing " .. methodName .. " for: " .. tostring(options.Title) .. " -> " .. tostring(result))
-                if BaddieHubSettings.SafeMode then
-                    -- Attempt standard WindUI safe configuration correction
-                    if options.Default and not options.Value then
+                warn("[BaddieHub SafeTab] Error calling '" .. methodName .. "': " .. tostring(result))
+                
+                -- Fallback: if options is a table, check if the library expected positional parameters or vice versa,
+                -- or just try to invoke it with common parameters.
+                if type(options) == "table" then
+                    -- If we passed Value but it expects Default, copy Value to Default and vice-versa
+                    if options.Value and not options.Default then
+                        options.Default = options.Value
+                    elseif options.Default and not options.Value then
                         options.Value = options.Default
                     end
                     
@@ -371,7 +445,20 @@ local function CreateFloatingToggleButton()
 
     Button.MouseButton1Click:Connect(function()
         if Window then
-            pcall(function() Window:Toggle() end)
+            pcall(function()
+                if Window.Toggle then
+                    Window:Toggle()
+                elseif Window.Minimize then
+                    Window:Minimize()
+                elseif Window.ToggleMinimize then
+                    Window:ToggleMinimize()
+                else
+                    local visible = Window.Visible
+                    if type(visible) == "boolean" then
+                        Window.Visible = not visible
+                    end
+                end
+            end)
         end
         pcall(function()
             Button.Size = UDim2.new(0, BaddieHubSettings.ButtonSize - 8, 0, BaddieHubSettings.ButtonSize - 8)
@@ -391,7 +478,20 @@ local function SetupGlobalKeybind()
             end)
             if parsedKey and input.KeyCode == parsedKey then
                 if Window then
-                    pcall(function() Window:Toggle() end)
+                    pcall(function()
+                        if Window.Toggle then
+                            Window:Toggle()
+                        elseif Window.Minimize then
+                            Window:Minimize()
+                        elseif Window.ToggleMinimize then
+                            Window:ToggleMinimize()
+                        else
+                            local visible = Window.Visible
+                            if type(visible) == "boolean" then
+                                Window.Visible = not visible
+                            end
+                        end
+                    end)
                 end
             end
         end
