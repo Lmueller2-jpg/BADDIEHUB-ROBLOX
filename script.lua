@@ -322,9 +322,10 @@ local function CreateTab(title, icon)
                 return nil
             end
             
+            local args = {...}
             -- Call the method safely inside pcall
             local success, result = pcall(function()
-                return method(realTab, options, ...)
+                return method(realTab, options, unpack(args))
             end)
             
             if not success then
@@ -342,7 +343,7 @@ local function CreateTab(title, icon)
                     
                     -- Retry call with adjusted options
                     local retrySuccess, retryResult = pcall(function()
-                        return method(realTab, options, ...)
+                        return method(realTab, options, unpack(args))
                     end)
                     if retrySuccess then
                         return retryResult
@@ -879,7 +880,7 @@ if BaddieHubSettings.EnableBloxFruits and (DetectedGame == "Blox Fruits" or Univ
                 end
             end)
         end
-    end)
+    })
 
     BloxTab:Button({
         Title = "Auto-Equip Melee Tool",
