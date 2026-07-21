@@ -305,6 +305,18 @@ local function GetHRP()
     return c:FindFirstChild("HumanoidRootPart")
 end
 
+local function GetPlayerLevel()
+    local lvl = 1
+    pcall(function()
+        if LP:FindFirstChild("Data") and LP.Data:FindFirstChild("Level") then
+            lvl = LP.Data.Level.Value
+        elseif LP:FindFirstChild("leaderstats") and LP.leaderstats:FindFirstChild("Level") then
+            lvl = LP.leaderstats.Level.Value
+        end
+    end)
+    return lvl
+end
+
 local function HasActiveQuest()
     local main = LP:FindFirstChild("PlayerGui") and LP.PlayerGui:FindFirstChild("Main")
     local quest = main and main:FindFirstChild("Quest")
@@ -1148,46 +1160,38 @@ if DetectedGame == "Blox Fruits" then
                 elseif selectedWeaponType == "Sword" and (tool.ToolTip == "Sword" or tool.Name == "Katana" or tool.Name == "Cutlass" or tool.Name:lower():find("blade") or tool.Name:lower():find("saber") or tool.Name:lower():find("sword")) then isMatch = true
                 elseif selectedWeaponType == "Blox Fruit" and (tool.ToolTip == "Blox Fruit" or tool.Name:lower():find("fruit") or tool.Name == "Ice" or tool.Name == "Light" or tool.Name == "Magma") then isMatch = true end
                 if isMatch then
-                    local hum = char:FindFirstChildOfClass("Humanoid")
-                    if hum then hum:EquipTool(tool); return tool end
+                    pcall(function() tool.Parent = char end)
+                    return tool
                 end
             end
         end
         -- Ultimate fallback: equip anything
         for _, tool in ipairs(LP.Backpack:GetChildren()) do
             if tool:IsA("Tool") then
-                local hum = char:FindFirstChildOfClass("Humanoid")
-                if hum then hum:EquipTool(tool); return tool end
+                pcall(function() tool.Parent = char end)
+                return tool
             end
         end
         return nil
     end
 
-    -- High performance spatial mob magnet
+    -- High performance workspace-wide target-based mob magnet
     local function pullMobs(keywords, targetPos)
         local myHrp = GetHRP()
         if not myHrp then return end
         pcall(function()
-            local op = OverlapParams.new()
-            op.FilterType = Enum.RaycastFilterType.Exclude
-            op.FilterDescendantsInstances = {LP.Character}
-            
-            local parts = WS:GetPartBoundsInRadius(myHrp.Position, 220, op)
-            for _, part in ipairs(parts) do
-                local char = part.Parent
-                local mob = char
-                if mob and mob:IsA("Model") then
-                    if mob.PrimaryPart and mob.PrimaryPart.Position.Y > 50000 then
-                        -- Skip this mob immediately, no print/warn allowed.
-                    else
-                        local hum = mob:FindFirstChild("Humanoid")
-                        local r_hrp = mob:FindFirstChild("HumanoidRootPart")
-                        if hum and hum.Health > 0 and r_hrp and r_hrp.Position.Y <= 50000 and not Players:GetPlayerFromCharacter(mob) then
-                            local isMob = false
-                            for _, kw in ipairs(keywords) do
-                                if mob.Name:lower():find(kw:lower()) then isMob = true; break end
-                            end
-                            if isMob then
+            for _, mob in ipairs(WS:GetChildren()) do
+                if mob:IsA("Model") and not Players:GetPlayerFromCharacter(mob) then
+                    local hum = mob:FindFirstChildOfClass("Humanoid")
+                    local r_hrp = mob:FindFirstChild("HumanoidRootPart") or mob.PrimaryPart
+                    if hum and hum.Health > 0 and r_hrp and r_hrp.Position.Y <= 50000 then
+                        local isMob = false
+                        for _, kw in ipairs(keywords) do
+                            if mob.Name:lower():find(kw:lower()) then isMob = true; break end
+                        end
+                        if isMob then
+                            local dist = (myHrp.Position - r_hrp.Position).Magnitude
+                            if dist < 300 then
                                 r_hrp.CanCollide = false
                                 r_hrp.CFrame = CFrame.new(targetPos) * CFrame.new(0, -3.2, -1)
                                 r_hrp.Velocity = Vector3.zero
