@@ -305,6 +305,20 @@ local function GetHRP()
     return c:FindFirstChild("HumanoidRootPart")
 end
 
+local function GetEnemyContainers()
+    local containers = {}
+    for _, folderName in ipairs({"Enemies", "Characters", "NPCs", "Mobs", "Monsters", "Living"}) do
+        local folder = WS:FindFirstChild(folderName)
+        if folder and (folder:IsA("Folder") or folder:IsA("Model")) then
+            table.insert(containers, folder)
+        end
+    end
+    if #containers == 0 then
+        table.insert(containers, WS)
+    end
+    return containers
+end
+
 local function GetPlayerLevel()
     local lvl = 1
     pcall(function()
@@ -499,47 +513,22 @@ TrackConnection(RunService.Heartbeat:Connect(function()
 end))
 
 -- =============================================================================
--- WIDGET COMPONENT: Button-Pair Slider (No-Lag Mobile Friendly UI element)
+-- WIDGET COMPONENT: Standard Touch-Friendly Slider (Orion Library Native)
 -- =============================================================================
 local function AddButtonSlider(tab, name, min, max, default, step, suffix, onChange)
-    local val = default
-    local lbl = tab:AddLabel(name .. ": " .. val .. (suffix or ""))
-    
-    local function updateLabel()
-        if lbl and lbl.Set then
-            pcall(function() lbl:Set(name .. ": " .. val .. (suffix or "")) end)
-        end
-    end
-
-    tab:AddButton({
-        Name = "[ - ]  " .. name,
-        Callback = function()
-            val = math.max(min, val - step)
-            onChange(val)
-            updateLabel()
-            OrionLib:MakeNotification({ Name = name, Content = tostring(val) .. (suffix or ""), Image = ICON, Time = 1 })
-        end
-    })
-    tab:AddButton({
-        Name = "[ + ]  " .. name,
-        Callback = function()
-            val = math.min(max, val + step)
-            onChange(val)
-            updateLabel()
-            OrionLib:MakeNotification({ Name = name, Content = tostring(val) .. (suffix or ""), Image = ICON, Time = 1 })
-        end
-    })
-    tab:AddTextbox({
-        Name = name .. " (Direct input)", Default = tostring(default), TextDisappear = false,
-        Callback = function(v)
-            local n = tonumber(v)
-            if n then
-                val = math.clamp(n, min, max)
-                onChange(val)
-                updateLabel()
+    pcall(function()
+        tab:AddSlider({
+            Name = name,
+            Min = min,
+            Max = max,
+            Default = default,
+            Increment = step or 1,
+            ValueName = suffix or "",
+            Callback = function(v)
+                onChange(v)
             end
-        end
-    })
+        })
+    end)
 end
 
 -- =============================================================================
@@ -561,6 +550,89 @@ local function ApplyBooster(on)
             end
         end)
     end
+end
+
+-- =============================================================================
+-- FLOATING TOGGLE BUTTON (Mobile-First Orion GUI Trigger Sentry)
+-- =============================================================================
+local function ToggleOrionUI()
+    pcall(function()
+        local g = CoreGui:FindFirstChild("Orion")
+        if g then
+            local f = g:FindFirstChildWhichIsA("Frame", true)
+            if f then f.Visible = not f.Visible end
+        end
+    end)
+end
+
+local function CreateFloatingToggleButton()
+    pcall(function()
+        local oldBtn = CoreGui:FindFirstChild("BaddieHubToggleButtonGui")
+        if oldBtn then oldBtn:Destroy() end
+        
+        local sg = Instance.new("ScreenGui")
+        sg.Name = "BaddieHubToggleButtonGui"
+        sg.ResetOnSpawn = false
+        sg.Parent = CoreGui
+        
+        local btn = Instance.new("TextButton", sg)
+        btn.Size = UDim2.fromOffset(50, 50)
+        btn.Position = UDim2.new(0.05, 0, 0.2, 0)
+        btn.BackgroundColor3 = Color3.fromRGB(15, 15, 24)
+        btn.Text = "B404"
+        btn.TextColor3 = Color3.fromRGB(140, 80, 255)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 13
+        btn.BorderSizePixel = 0
+        btn.Active = true
+        btn.Draggable = true
+        
+        local corner = Instance.new("UICorner", btn)
+        corner.CornerRadius = UDim.new(0, 25)
+        
+        local stroke = Instance.new("UIStroke", btn)
+        stroke.Color = Color3.fromRGB(140, 80, 255)
+        stroke.Thickness = 1.5
+        
+        local dragging = false
+        local dragInput, dragStart, startPos
+        
+        btn.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                startPos = btn.Position
+                
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        dragging = false
+                    end
+                end)
+            end
+        end)
+        
+        btn.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                dragInput = input
+            end
+        end)
+        
+        TrackConnection(UIS.InputChanged:Connect(function(input)
+            if input == dragInput and dragging then
+                local delta = input.Position - dragStart
+                btn.Position = UDim2.new(
+                    startPos.X.Scale, 
+                    startPos.X.Offset + delta.X, 
+                    startPos.Y.Scale, 
+                    startPos.Y.Offset + delta.Y
+                )
+            end
+        end))
+        
+        btn.MouseButton1Click:Connect(function()
+            ToggleOrionUI()
+        end)
+    end)
 end
 
 -- =============================================================================
@@ -713,15 +785,19 @@ PlayerTab:AddToggle({
 })
 
 -- Custom Flight Controller (Smooth & Multi-platform)
-local flyConn, flyBV, flyBG
+local flyConn
+local tempPlatform = nil
 local function StopFly()
     BaddieHub.Config.FlyEnabled = false
     RemoveMobileFlyControls()
     if flyConn then flyConn:Disconnect(); flyConn = nil end
     pcall(function()
-        if flyBV then flyBV:Destroy(); flyBV = nil end
-        if flyBG then flyBG:Destroy(); flyBG = nil end
-        local h = GetHum(); if h then h.PlatformStand = false end
+        if tempPlatform then tempPlatform:Destroy(); tempPlatform = nil end
+        local h = GetHum()
+        if h then
+            h.PlatformStand = false
+            h:ChangeState(Enum.HumanoidStateType.Running)
+        end
     end)
 end
 
@@ -732,16 +808,29 @@ local function StartFly()
     local hum  = char and char:FindFirstChildOfClass("Humanoid")
     if not hrp or not hum then StopFly(); return end
     
-    hum.PlatformStand = true
-    flyBV = Instance.new("BodyVelocity", hrp); flyBV.Velocity = Vector3.zero; flyBV.MaxForce = Vector3.new(1e9,1e9,1e9)
-    flyBG = Instance.new("BodyGyro", hrp); flyBG.MaxTorque = Vector3.new(1e9,1e9,1e9); flyBG.D = 100
+    pcall(function()
+        if tempPlatform then tempPlatform:Destroy() end
+        tempPlatform = Instance.new("Part")
+        tempPlatform.Name = "BaddieFlyPlatform"
+        tempPlatform.Size = Vector3.new(6, 1, 6)
+        tempPlatform.Transparency = 1
+        tempPlatform.Anchored = true
+        tempPlatform.CanCollide = true
+        tempPlatform.Parent = WS
+    end)
     
-    -- Create Mobile control pads if touch screen active
     CreateMobileFlyControls()
     
-    flyConn = RunService.Heartbeat:Connect(function()
+    local flyPos = hrp.Position
+    flyConn = RunService.Heartbeat:Connect(function(dt)
         if not BaddieHub.Config.FlyEnabled then return end
         pcall(function()
+            local hrp = GetHRP()
+            local hum = GetHum()
+            if not hrp or not hum then return end
+            
+            hum:ChangeState(Enum.HumanoidStateType.Flying)
+            
             local dir = Vector3.zero
             local cf  = Camera.CFrame
             
@@ -753,19 +842,29 @@ local function StartFly()
             if UIS:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.new(0, 1, 0) end
             if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then dir = dir - Vector3.new(0, 1, 0) end
             
-            -- Mobile Inputs Override
+            -- Mobile joystick support
+            if UIS.MoveDirection.Magnitude > 0 then
+                local moveDir = UIS.MoveDirection
+                local camLook = cf.LookVector
+                dir = dir + Vector3.new(moveDir.X, camLook.Y * moveDir.Magnitude, moveDir.Z)
+            end
+            
+            -- Mobile Fly Controls (UP / DOWN buttons)
             if BaddieHub.MobileFlyState then
                 if BaddieHub.MobileFlyState.Up() then dir = dir + Vector3.new(0, 1, 0) end
                 if BaddieHub.MobileFlyState.Down() then dir = dir - Vector3.new(0, 1, 0) end
-                -- Use camera look direction for forward flight during movement
-                if UIS.MoveDirection.Magnitude > 0 then
-                    local camLook = cf.LookVector
-                    dir = dir + (camLook * UIS.MoveDirection.Magnitude)
-                end
             end
             
-            flyBV.Velocity = dir.Magnitude > 0 and dir.Unit * BaddieHub.Config.FlySpeed or Vector3.zero
-            flyBG.CFrame = cf
+            if dir.Magnitude > 0 then
+                flyPos = flyPos + (dir.Unit * BaddieHub.Config.FlySpeed * dt)
+            end
+            
+            hrp.CFrame = CFrame.new(flyPos) * cf.Rotation
+            hrp.Velocity = Vector3.zero
+            
+            if tempPlatform and tempPlatform.Parent then
+                tempPlatform.CFrame = CFrame.new(flyPos - Vector3.new(0, 3, 0))
+            end
         end)
     end)
     TrackConnection(flyConn)
@@ -780,12 +879,12 @@ AddButtonSlider(PlayerTab, "Flight Velocity", 10, 500, 60, 20, " studs/s", funct
 
 -- Hover float above ground
 local hoverConn = nil
-local hoverBP = nil
+local hoverPlatform = nil
 local function StopHover()
     BaddieHub.Config.HoverEnabled = false
     if hoverConn then hoverConn:Disconnect(); hoverConn = nil end
     pcall(function()
-        if hoverBP then hoverBP:Destroy(); hoverBP = nil end
+        if hoverPlatform then hoverPlatform:Destroy(); hoverPlatform = nil end
         local h = GetHum(); if h then h.PlatformStand = false end
     end)
 end
@@ -802,7 +901,6 @@ PlayerTab:AddToggle({
             pcall(function()
                 local hrp = GetHRP(); local hum = GetHum()
                 if not hrp or not hum then return end
-                hum.PlatformStand = true
                 
                 local params = RaycastParams.new()
                 params.FilterDescendantsInstances = {LP.Character}
@@ -810,14 +908,23 @@ PlayerTab:AddToggle({
                 
                 local ray = WS:Raycast(hrp.Position, Vector3.new(0, -500, 0), params)
                 local groundY = ray and ray.Position.Y or (hrp.Position.Y - BaddieHub.Config.HoverHeight)
+                local targetY = groundY + BaddieHub.Config.HoverHeight
                 
-                if not hoverBP or not hoverBP.Parent then
-                    hoverBP = Instance.new("BodyPosition", hrp)
-                    hoverBP.Name = "BaddieHoverBP"
-                    hoverBP.MaxForce = Vector3.new(0, 1e9, 0)
-                    hoverBP.D = 500; hoverBP.P = 15000
+                if hrp.Position.Y < targetY then
+                    hrp.CFrame = CFrame.new(hrp.Position.X, targetY, hrp.Position.Z) * hrp.CFrame.Rotation
+                    hrp.Velocity = Vector3.new(hrp.Velocity.X, 0, hrp.Velocity.Z)
                 end
-                hoverBP.Position = Vector3.new(hrp.Position.X, groundY + BaddieHub.Config.HoverHeight, hrp.Position.Z)
+                
+                if not hoverPlatform or not hoverPlatform.Parent then
+                    hoverPlatform = Instance.new("Part")
+                    hoverPlatform.Name = "BaddieHoverPlatform"
+                    hoverPlatform.Size = Vector3.new(6, 1, 6)
+                    hoverPlatform.Transparency = 1
+                    hoverPlatform.Anchored = true
+                    hoverPlatform.CanCollide = true
+                    hoverPlatform.Parent = WS
+                end
+                hoverPlatform.CFrame = CFrame.new(hrp.Position.X, targetY - 3, hrp.Position.Z)
             end)
         end)
         TrackConnection(hoverConn)
@@ -1180,22 +1287,31 @@ if DetectedGame == "Blox Fruits" then
         local myHrp = GetHRP()
         if not myHrp then return end
         pcall(function()
-            for _, mob in ipairs(WS:GetChildren()) do
-                if mob:IsA("Model") and not Players:GetPlayerFromCharacter(mob) then
-                    local hum = mob:FindFirstChildOfClass("Humanoid")
-                    local r_hrp = mob:FindFirstChild("HumanoidRootPart") or mob.PrimaryPart
-                    if hum and hum.Health > 0 and r_hrp and r_hrp.Position.Y <= 50000 then
-                        local isMob = false
-                        for _, kw in ipairs(keywords) do
-                            if mob.Name:lower():find(kw:lower()) then isMob = true; break end
-                        end
-                        if isMob then
-                            local dist = (myHrp.Position - r_hrp.Position).Magnitude
-                            if dist < 300 then
-                                r_hrp.CanCollide = false
-                                r_hrp.CFrame = CFrame.new(targetPos) * CFrame.new(0, -3.2, -1)
-                                r_hrp.Velocity = Vector3.zero
-                                hum.PlatformStand = true
+            local containers = GetEnemyContainers()
+            for _, folder in ipairs(containers) do
+                for _, mob in ipairs(folder:GetChildren()) do
+                    if mob:IsA("Model") and not Players:GetPlayerFromCharacter(mob) then
+                        local hum = mob:FindFirstChildOfClass("Humanoid")
+                        local r_hrp = mob:FindFirstChild("HumanoidRootPart") or mob.PrimaryPart
+                        if hum and hum.Health > 0 and r_hrp and r_hrp.Position.Y <= 50000 then
+                            local isMob = false
+                            for _, kw in ipairs(keywords) do
+                                if mob.Name:lower():find(kw:lower()) then isMob = true; break end
+                            end
+                            if isMob then
+                                local dist = (myHrp.Position - r_hrp.Position).Magnitude
+                                if dist < 300 then
+                                    for _, part in ipairs(mob:GetDescendants()) do
+                                        if part:IsA("BasePart") then
+                                            part.CanCollide = false
+                                            part.Velocity = Vector3.zero
+                                            part.RotVelocity = Vector3.zero
+                                        end
+                                    end
+                                    r_hrp.CFrame = CFrame.new(targetPos) * CFrame.new(0, -3.2, -1)
+                                    r_hrp.Velocity = Vector3.zero
+                                    hum.PlatformStand = true
+                                end
                             end
                         end
                     end
@@ -1415,11 +1531,49 @@ if DetectedGame == "Blox Fruits" then
             pcall(function()
                 local hrp = GetHRP(); if not hrp then return end
                 local closest, closestDist = nil, math.huge
+                
+                local function IsRealDroppedFruit(o)
+                    if not o then return false end
+                    local isTool = o:IsA("Tool")
+                    local isFruitPart = (o:IsA("MeshPart") or o:IsA("Part") or o:IsA("Model"))
+                    if not (isTool or isFruitPart) then return false end
+                    local nameLower = o.Name:lower()
+                    if not (nameLower:find("fruit") or nameLower:find("devil")) then return false end
+                    if nameLower:find("dealer") or nameLower:find("shop") or nameLower:find("merchant") or nameLower:find("npc") or nameLower:find("spawn") then
+                        return false
+                    end
+                    if o:IsA("Model") and o:FindFirstChildOfClass("Humanoid") then
+                        return false
+                    end
+                    local p = o.Parent
+                    while p and p ~= WS do
+                        local pName = p.Name:lower()
+                        if pName:find("dealer") or pName:find("shop") or pName:find("merchant") or pName:find("npc") or p:FindFirstChildOfClass("Humanoid") then
+                            return false
+                        end
+                        p = p.Parent
+                    end
+                    if isTool then return true end
+                    if o:IsA("MeshPart") or o:IsA("Part") then
+                        if o:FindFirstChildOfClass("TouchTransmitter") then return true end
+                    end
+                    if o:IsA("Model") then
+                        local hasTouch = false
+                        for _, child in ipairs(o:GetDescendants()) do
+                            if child:IsA("TouchTransmitter") then hasTouch = true; break end
+                        end
+                        if hasTouch then return true end
+                    end
+                    return false
+                end
+
                 for _, o in ipairs(WS:GetDescendants()) do
-                    if (o.Name:lower():find("fruit") or o.Name:lower():find("devil")) and (o:IsA("Model") or o:IsA("BasePart")) then
-                        local pos = o:IsA("Model") and o:GetPivot().Position or o.Position
-                        local d = (hrp.Position - pos).Magnitude
-                        if d < closestDist then closestDist = d; closest = pos end
+                    if IsRealDroppedFruit(o) then
+                        local pos = o:IsA("Model") and o:GetPivot().Position or (o:IsA("BasePart") and o.Position)
+                        if pos then
+                            local d = (hrp.Position - pos).Magnitude
+                            if d < closestDist then closestDist = d; closest = pos end
+                        end
                     end
                 end
                 if closest then
@@ -1889,6 +2043,12 @@ SettingsTab:AddButton({
         StopHover()
         RemoveMobileFlyControls()
         
+        -- Clean up floating toggle button
+        pcall(function()
+            local toggleGui = CoreGui:FindFirstChild("BaddieHubToggleButtonGui")
+            if toggleGui then toggleGui:Destroy() end
+        end)
+        
         -- Clean up tracking connections securely
         for _, conn in ipairs(BaddieHub.Connections) do
             pcall(function() conn:Disconnect() end)
@@ -2042,6 +2202,7 @@ ft:Play()
 ft.Completed:Connect(function() if LoadGui and LoadGui.Parent then LoadGui:Destroy() end end)
 
 task.wait(0.4)
+pcall(CreateFloatingToggleButton)
 OrionLib:Init()
 task.wait(0.8)
 
