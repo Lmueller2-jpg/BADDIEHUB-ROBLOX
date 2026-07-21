@@ -1,3 +1,10 @@
+--[[
+    ____                 _     _ _      _  _    ___  _  _   __  __ _   _ _   _____ ___ _   _ _   _ _   _ _   _ _   _ 
+   | __ )  __ _  __ _  __| | __| (_) ___| || |  / _ \\| || | |  \\/  | | | | | |_   _|_ _| | | | | | | | | | | | |
+   |  _ \\ / _\` |/ _\` |/ _\` |/ _\` | |/ _ \\_  _| | | | | || |_| |\\/| | | | | |   | |  | || | | | | | | | | | | |
+   | |_) | (_| | (_| | (_| | (_| | |  __/ | |   | |_| |__   _| |  | | |_| | |___| |  | || |_| | |_| | |_| |_| |_|
+   |____/ \\__,_|\\__,_|\\__,_|\\__,_|_|\\___| |_|    \\___/   |_| |_|  |_|\\___/|_____|_| |___|\\___/ \\___/ \\___/\\___/
+   
    ======================================================================================================
    BADDIE404 MULTIHUB v5.1 - Premium Multi-Game Roblox Exploit Client
    Remastered with WindUI Integration (Touch-Optimized for Delta, Fluxus, Vega X, Solara, Wave)
@@ -219,7 +226,8 @@ SetStatus("Detected Sandbox Game: " .. DetectedGame); SetProgress(60, 0.3); task
 SetStatus("Injecting Footagesus WindUI Assets..."); SetProgress(85, 0.2); task.wait(0.2)
 local WindUI, Window
 local loaderSuccess, loaderErr = pcall(function()
-    WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+    local source = game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua")
+    WindUI = loadstring(source)()
     Window = WindUI:CreateWindow({
         Title = "BADDIE404 MULTIHUB",
         Subtitle = DetectedGame .. " Mode",
@@ -230,7 +238,7 @@ local loaderSuccess, loaderErr = pcall(function()
         Theme = BaddieHubSettings.Theme
     })
     
-    if WindUI.SetTheme then
+    if WindUI and WindUI.SetTheme then
         pcall(function()
             WindUI:SetTheme({
                 Accent = BaddieHubSettings.AccentColor
@@ -239,9 +247,9 @@ local loaderSuccess, loaderErr = pcall(function()
     end
 end)
 
-if not loaderSuccess or not WindUI then
+if not loaderSuccess or not WindUI or not Window then
     warn("[BaddieHub] WindUI Library failure: " .. tostring(loaderErr))
-    SetStatus("Network block! Check Roblox executor."); SetProgress(100, 0.5); task.wait(2)
+    SetStatus("Network/Executor block! Failed to load UI."); SetProgress(100, 0.5); task.wait(3)
     LoadGui:Destroy()
     return
 end
@@ -796,7 +804,7 @@ if BaddieHubSettings.EnableBloxFruits and (DetectedGame == "Blox Fruits" or Univ
                 end
             end)
         end
-    end)
+    })
 
     BloxTab:Button({
         Title = "Auto-Equip Melee Tool",
