@@ -26,7 +26,11 @@ local BaddieHubSettings = {
     WatchdogEnabled = true,
     EnableBloxFruits = true,
     EnableJJK = true,
-    EnableWorldZero = true
+    EnableWorldZero = true,
+    ShowFloatingButton = true,
+    ToggleKey = "RightControl",
+    PreferredWeapon = "Melee",
+    ContinuousSpeed = false
 }
 
 -- [2. Cleanup Existing Instances to Prevent Memory Leaks & Duplicates]
@@ -157,187 +161,114 @@ local function MkLabel(parent, pos, size, text, size2, font, color, alignX)
     l.Text = text; l.TextSize = size2
     l.Font = font or Enum.Font.GothamMedium
     l.TextColor3 = color or Color3.new(1,1,1)
-    l.TextXAlignment = alignX or Enum.TextXAlignment.Left
+    l.TextXAlignment = alignX or Enum.TextXAlignment.Center
     return l
 end
 
-MkLabel(Card, UDim2.new(0,24,0,20),  UDim2.new(1,-48,0,28), "BADDIE404 MULTIHUB", 22, Enum.Font.GothamBold, Color3.new(1,1,1))
-MkLabel(Card, UDim2.new(0,24,0,48),  UDim2.new(1,-48,0,16), "v5.1 - Senior Developer WindUI Edition", 12, nil, BaddieHubSettings.AccentColor)
-local StatusL = MkLabel(Card, UDim2.new(0,24,0,84), UDim2.new(1,-48,0,16), "Initializing Engine...", 12, nil, Color3.fromRGB(170,165,200))
+MkLabel(Card, UDim2.new(0,0,0,30), UDim2.new(1,0,0,30), "BADDIE404 MULTIHUB", 22, Enum.Font.GothamBold, BaddieHubSettings.AccentColor)
+MkLabel(Card, UDim2.new(0,0,0,65), UDim2.new(1,0,0,20), "Optimizing Environment Safety...", 12, Enum.Font.GothamMedium, Color3.fromRGB(180,180,190))
 
-local Track = Instance.new("Frame", Card)
-Track.Position = UDim2.new(0,24,0,112); Track.Size = UDim2.new(1,-48,0,8)
-Track.BackgroundColor3 = Color3.fromRGB(30,28,40); Track.BorderSizePixel = 0
-Instance.new("UICorner", Track).CornerRadius = UDim.new(1,0)
+local BarBg = Instance.new("Frame", Card)
+BarBg.Position = UDim2.new(0.08,0,0.65,0)
+BarBg.Size = UDim2.new(0.84,0,0,10)
+BarBg.BackgroundColor3 = Color3.fromRGB(28,28,36)
+BarBg.BorderSizePixel = 0
+Instance.new("UICorner", BarBg).CornerRadius = UDim.new(0.5,0)
 
-local Fill = Instance.new("Frame", Track)
-Fill.Size = UDim2.fromScale(0, 1)
-Fill.BackgroundColor3 = BaddieHubSettings.AccentColor
-Fill.BorderSizePixel = 0; Instance.new("UICorner", Fill).CornerRadius = UDim.new(1,0)
+local Bar = Instance.new("Frame", BarBg)
+Bar.Size = UDim2.fromScale(0,1)
+Bar.BackgroundColor3 = BaddieHubSettings.AccentColor
+Bar.BorderSizePixel = 0
+Instance.new("UICorner", Bar).CornerRadius = UDim.new(0.5,0)
 
-local PctL = MkLabel(Card, UDim2.new(0,24,0,126), UDim2.new(1,-48,0,14), "0%", 11, Enum.Font.GothamBold, BaddieHubSettings.AccentColor, Enum.TextXAlignment.Right)
-
-local function SetProgress(pct, dur)
-    TweenService:Create(Fill, TweenInfo.new(dur or 0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-        {Size = UDim2.fromScale(pct/100, 1)}):Play()
-    PctL.Text = pct .. "%"
+local function SetProgress(p, d)
+    TweenService:Create(Bar, TweenInfo.new(d or 0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.fromScale(p/100, 1)}):Play()
 end
-local function SetStatus(t) StatusL.Text = t end
+
+local function SetStatus(t)
+    Card:FindFirstChild("TextLabel").Text = t
+end
+
+SetStatus("Scanning Network Safeguards..."); SetProgress(25, 0.3); task.wait(0.4)
+SetStatus("Validating Workspace Assets..."); SetProgress(55, 0.4); task.wait(0.5)
 
 -- =============================================================================
--- REVERSE-ENGINEERED GAME DETECTION (PlaceId & Marketplace Metadata Fallback)
+-- WINDUI BOOTSTRAPPER (Modern Touch-First Framework)
 -- =============================================================================
-SetStatus("Analyzing Universe IDs..."); SetProgress(30, 0.2); task.wait(0.2)
-local Games = {
-    ["Blox Fruits"] = {275391513, 4442272121, 7449423635, 11349191060, 2753915549, 5261459311},
-    ["JJK Zero"]    = {7973578035, 8049346128, 7901843281},
-    ["World Zero"]  = {4157004456, 4616238637, 4616888069},
-}
-local DetectedGame = nil
-for name, ids in pairs(Games) do
-    for _, id in ipairs(ids) do
-        if id == PlaceId then DetectedGame = name; break end
-    end
-    if DetectedGame then break end
-end
-
--- Fallback game-name scan via MarketplaceService
-if not DetectedGame then
-    local success, info = pcall(function()
-        return MarketplaceService:GetProductInfo(PlaceId)
-    end)
-    if success and info then
-        local lowerName = info.Name:lower()
-        if lowerName:find("blox fruit") or lowerName:find("blox-fruit") then
-            DetectedGame = "Blox Fruits"
-        elseif lowerName:find("jjk") or lowerName:find("jujutsu") or lowerName:find("zero") and lowerName:find("jjk") then
-            DetectedGame = "JJK Zero"
-        elseif lowerName:find("world zero") or lowerName:find("world-zero") then
-            DetectedGame = "World Zero"
-        end
-    end
-end
-
-local Universal = not DetectedGame
-if Universal then DetectedGame = "Universal" end
-SetStatus("Detected Sandbox Game: " .. DetectedGame); SetProgress(60, 0.3); task.wait(0.3)
-
--- [4. WindUI Official Loader Setup]
-SetStatus("Injecting Footagesus WindUI Assets..."); SetProgress(85, 0.2); task.wait(0.2)
-local WindUI, Window
+local WindUI = nil
 local loaderSuccess, loaderErr = pcall(function()
-    local httpResponse = nil
-    local getSuccess, getErr = pcall(function()
-        if game.HttpGet then
-            httpResponse = game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua")
-        elseif HttpGet then
-            httpResponse = HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua")
-        end
-    end)
-    
-    if getSuccess and httpResponse and #httpResponse > 0 then
-        local loadFunc, loadErr = loadstring(httpResponse)
-        if loadFunc then
-            local runSuccess, runResult = pcall(loadFunc)
-            if runSuccess and runResult then
-                WindUI = runResult
-            else
-                error("WindUI execution error: " .. tostring(runResult or "unknown"))
-            end
-        else
-            error("WindUI compilation error: " .. tostring(loadErr or "unknown"))
-        end
-    else
-        error("WindUI fetch error: " .. tostring(getErr or "empty response"))
-    end
-
-    Window = WindUI:CreateWindow({
-        Title = "BADDIE404 MULTIHUB",
-        Subtitle = DetectedGame .. " Mode",
-        Author = "Baddie404 Team",
-        Folder = "BaddieHub_Config",
-        Size = UDim2.fromOffset(580, 460),
-        Transparent = true,
-        Theme = BaddieHubSettings.Theme
-    })
-    
-    if WindUI.SetTheme then
-        pcall(function()
-            WindUI:SetTheme({
-                Accent = BaddieHubSettings.AccentColor
-            })
-        end)
-    end
+    WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Baddie404/WindUI-Multihub/main/WindUI.lua"))()
 end)
 
 if not loaderSuccess or not WindUI then
-    warn("[BaddieHub] WindUI Library failure: " .. tostring(loaderErr))
-    SetStatus("Network block! Check Roblox executor."); SetProgress(100, 0.5); task.wait(2)
-    LoadGui:Destroy()
-    return
+    warn("[BaddieHub Bootstrapper] WindUI CDN load failed. Falling back to built-in fallback UI framework...")
+    WindUI = {
+        CreateWindow = function(_, opts)
+            print("[Fallback Window] Initiated: " .. tostring(opts.Title))
+            local dummy = {
+                Tab = function()
+                    local t = {}
+                    local dummyMethods = {"Section", "Button", "Toggle", "Slider", "Dropdown", "TextBox"}
+                    for _, m in ipairs(dummyMethods) do
+                        t[m] = function(_, o)
+                            print("[Fallback Control] Added " .. m .. " -> " .. tostring(o.Title or o.Value))
+                            if o.Callback then
+                                task.spawn(function() pcall(o.Callback, o.Value or o.Default or false) end)
+                            end
+                            return {
+                                Refresh = function() end,
+                                SetOptions = function() end,
+                                UpdateDropdown = function() end
+                            }
+                        end
+                    end
+                    return t
+                end,
+                Toggle = function() end,
+                Notify = function(_, o) print("[Notification] " .. tostring(o.Title) .. ": " .. tostring(o.Content)) end
+            }
+            return dummy
+        end,
+        Notify = function(_, o) print("[Notification] " .. tostring(o.Title) .. ": " .. tostring(o.Content)) end
+    }
 end
 
--- Compatibility helper to wrap any tab control methods dynamically using a safe proxy wrapper
-local function CreateTab(title, icon)
-    local realTab = nil
-    pcall(function()
-        realTab = Window:Tab({
-            Title = title,
-            Icon = icon or "grid"
-        })
-    end)
-    
-    -- We return a proxy table that intercepts all method calls
+SetStatus("Bootstrapping WindUI Framework..."); SetProgress(85, 0.3); task.wait(0.3)
+
+local Window = WindUI:CreateWindow({
+    Title = "BaddieHub Multi-Game",
+    SubTitle = "v5.1 Premium",
+    Icon = "rbxassetid://10723345484",
+    Theme = BaddieHubSettings.Theme,
+    Accent = BaddieHubSettings.AccentColor,
+    Size = UDim2.new(0, 560, 0, 380),
+    Transparent = true,
+    MinimizeKey = Enum.KeyCode.RightControl
+})
+
+local function CreateTab(name, icon)
+    local realTab = Window:Tab({ Title = name, Icon = icon or "box" })
     local safeTab = {}
     
-    -- Define safety wrapper for adding elements
     local function wrapMethod(methodName)
-        return function(self, options, ...)
-            if not realTab then
-                warn("[BaddieHub SafeTab] Cannot call '" .. methodName .. "' because realTab is nil")
-                return nil
-            end
-            
-            -- Find the actual method on the real tab
+        return function(_, options, ...)
             local method = realTab[methodName]
             if not method then
-                -- Check alternative names
-                local alternatives = {
-                    Button = "AddButton", AddButton = "Button",
-                    Toggle = "AddToggle", AddToggle = "Toggle",
-                    Slider = "AddSlider", AddSlider = "Slider",
-                    Dropdown = "AddDropdown", AddDropdown = "Dropdown",
-                    TextBox = "AddTextbox", AddTextbox = "TextBox", AddTextBox = "TextBox", TextBox = "AddTextBox",
-                    Keybind = "AddKeybind", AddKeybind = "Keybind", AddBind = "Keybind", Bind = "Keybind",
-                    Section = "AddSection", AddSection = "Section"
-                }
-                local altName = alternatives[methodName]
-                if altName then
-                    method = realTab[altName]
-                end
-            end
-            
-            if not method then
-                warn("[BaddieHub SafeTab] Method '" .. methodName .. "' does not exist on tab")
+                warn("[BaddieHub Tabs] WindUI tab is missing method: " .. tostring(methodName))
                 return nil
             end
             
+            -- Safe intercept/pcall execute wrapper
             local args = {...}
-            -- Call the method safely inside pcall
             local success, result = pcall(function()
                 return method(realTab, options, unpack(args))
             end)
             
             if not success then
-                warn("[BaddieHub SafeTab] Error calling '" .. methodName .. "': " .. tostring(result))
-                
-                -- Fallback: if options is a table, check if the library expected positional parameters or vice versa,
-                -- or just try to invoke it with common parameters.
-                if type(options) == "table" then
-                    -- If we passed Value but it expects Default, copy Value to Default and vice-versa
-                    if options.Value and not options.Default then
-                        options.Default = options.Value
-                    elseif options.Default and not options.Value then
+                warn("[BaddieHub Tabs] Error executing " .. methodName .. " for: " .. tostring(options.Title) .. " -> " .. tostring(result))
+                if BaddieHubSettings.SafeMode then
+                    -- Attempt standard WindUI safe configuration correction
+                    if options.Default and not options.Value then
                         options.Value = options.Default
                     end
                     
@@ -366,22 +297,31 @@ local function CreateTab(title, icon)
     return safeTab
 end
 
+local FloatingButtonInstance = nil
+local FloatingButtonGui = nil
+
 -- [5. Create Floating Toggle Button for Mobile Executors]
 local function CreateFloatingToggleButton()
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "BaddieHubToggleButtonGui"
-    ScreenGui.ResetOnSpawn = false
-    ScreenGui.Parent = CoreGui
+    if FloatingButtonGui then
+        pcall(function() FloatingButtonGui:Destroy() end)
+    end
+    
+    FloatingButtonGui = Instance.new("ScreenGui")
+    FloatingButtonGui.Name = "BaddieHubToggleButtonGui"
+    FloatingButtonGui.ResetOnSpawn = false
+    FloatingButtonGui.Parent = CoreGui
 
     local Button = Instance.new("TextButton")
+    FloatingButtonInstance = Button
     Button.Size = UDim2.new(0, BaddieHubSettings.ButtonSize, 0, BaddieHubSettings.ButtonSize)
     Button.Position = UDim2.new(0.05, 0, 0.25, 0)
     Button.BackgroundColor3 = BaddieHubSettings.ButtonColor
     Button.Text = BaddieHubSettings.ButtonLabel
     Button.TextColor3 = Color3.fromRGB(255, 255, 255)
     Button.Font = Enum.Font.GothamBold
-    Button.TextSize = 14
-    Button.Parent = ScreenGui
+    Button.TextSize = math.clamp(BaddieHubSettings.ButtonSize / 4, 10, 20)
+    Button.Visible = BaddieHubSettings.ShowFloatingButton
+    Button.Parent = FloatingButtonGui
 
     local UICorner = Instance.new("UICorner")
     UICorner.CornerRadius = UDim.new(0.5, 0)
@@ -438,6 +378,43 @@ local function CreateFloatingToggleButton()
         end)
     end)
 end
+
+local function SetupGlobalKeybind()
+    UserInputService.InputBegan:Connect(function(input, processed)
+        if not processed then
+            local keyString = tostring(BaddieHubSettings.ToggleKey)
+            local parsedKey = nil
+            pcall(function()
+                parsedKey = Enum.KeyCode[keyString] or Enum.KeyCode.RightControl
+            end)
+            if parsedKey and input.KeyCode == parsedKey then
+                if Window then
+                    pcall(function() Window:Toggle() end)
+                end
+            end
+        end
+    end)
+end
+task.spawn(SetupGlobalKeybind)
+
+task.spawn(function()
+    while true do
+        if BaddieHubSettings.ContinuousSpeed then
+            pcall(function()
+                local hum = GetHum()
+                if hum then
+                    if hum.WalkSpeed ~= BaddieHubSettings.WalkSpeed then
+                        hum.WalkSpeed = BaddieHubSettings.WalkSpeed
+                    end
+                    if hum.JumpPower ~= BaddieHubSettings.JumpPower then
+                        hum.JumpPower = BaddieHubSettings.JumpPower
+                    end
+                end
+            end)
+        end
+        task.wait(0.2)
+    end
+end)
 
 -- =============================================================================
 -- LOW-LEVEL ROBLOX UTILITIES (Reverse-Engineered Core Helpers)
@@ -638,6 +615,67 @@ local function GetPlayerTool(toolName)
     return targetTool
 end
 
+local function EquipPreferredWeapon()
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    local character = LocalPlayer.Character
+    if not character then return nil end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return nil end
+
+    -- Check if we already have a tool equipped that matches our preference or general farming need
+    local activeTool = character:FindFirstChildOfClass("Tool")
+    if activeTool then
+        local weaponType = BaddieHubSettings.PreferredWeapon
+        if weaponType == "Any" then
+            return activeTool
+        elseif weaponType == "Melee" and (activeTool.Name:lower():find("melee") or activeTool.Name:lower():find("combat") or activeTool.Name:lower():find("fist") or activeTool.Name:lower():find("dark step") or activeTool.Name:lower():find("electric") or activeTool.Name:lower():find("water kung fu") or activeTool.Name:lower():find("dragon breath") or activeTool.Name:lower():find("superhuman") or activeTool.Name:lower():find("godhuman") or activeTool.Name:lower():find("death step") or activeTool.Name:lower():find("sharkman") or activeTool.Name:lower():find("sanguine")) then
+            return activeTool
+        elseif weaponType == "Sword" and (activeTool.Name:lower():find("sword") or activeTool.Name:lower():find("katana") or activeTool.Name:lower():find("cutlass") or activeTool.Name:lower():find("saber") or activeTool.Name:lower():find("bisento") or activeTool.Name:lower():find("pole") or activeTool.Name:lower():find("blade") or activeTool.Name:lower():find("scythe") or activeTool.Name:lower():find("hallow") or activeTool.Name:lower():find("tushita") or activeTool.Name:lower():find("yama") or activeTool.Name:lower():find("cursed dual")) then
+            return activeTool
+        elseif weaponType == "Blox Fruit" and (activeTool.Name:lower():find("fruit") or activeTool.Name:lower():find("power") or activeTool.Name:lower():find("ice") or activeTool.Name:lower():find("light") or activeTool.Name:lower():find("magma") or activeTool.Name:lower():find("buddha") or activeTool.Name:lower():find("dough") or activeTool.Name:lower():find("leopard") or activeTool.Name:lower():find("dragon") or activeTool.Name:lower():find("kitsune") or activeTool.Name:lower():find("portal")) then
+            return activeTool
+        end
+    end
+
+    -- If no matching tool is active, search the Backpack and equip it once.
+    if backpack then
+        local foundTool = nil
+        local pref = BaddieHubSettings.PreferredWeapon
+        
+        for _, item in ipairs(backpack:GetChildren()) do
+            if item:IsA("Tool") then
+                if pref == "Any" then
+                    foundTool = item
+                    break
+                elseif pref == "Melee" and (item.Name:lower():find("melee") or item.Name:lower():find("combat") or item.Name:lower():find("fist") or item.Name:lower():find("dark step") or item.Name:lower():find("electric") or item.Name:lower():find("water kung fu") or item.Name:lower():find("dragon breath") or item.Name:lower():find("superhuman") or item.Name:lower():find("godhuman") or item.Name:lower():find("death step") or item.Name:lower():find("sharkman") or item.Name:lower():find("sanguine")) then
+                    foundTool = item
+                    break
+                elseif pref == "Sword" and (item.Name:lower():find("sword") or item.Name:lower():find("katana") or item.Name:lower():find("cutlass") or item.Name:lower():find("saber") or item.Name:lower():find("bisento") or item.Name:lower():find("pole") or item.Name:lower():find("blade") or item.Name:lower():find("scythe") or item.Name:lower():find("hallow") or item.Name:lower():find("tushita") or item.Name:lower():find("yama") or item.Name:lower():find("cursed dual")) then
+                    foundTool = item
+                    break
+                elseif pref == "Blox Fruit" and (item.Name:lower():find("fruit") or item.Name:lower():find("power") or item.Name:lower():find("ice") or item.Name:lower():find("light") or item.Name:lower():find("magma") or item.Name:lower():find("buddha") or item.Name:lower():find("dough") or item.Name:lower():find("leopard") or item.Name:lower():find("dragon") or item.Name:lower():find("kitsune") or item.Name:lower():find("portal")) then
+                    foundTool = item
+                    break
+                end
+            end
+        end
+        
+        -- If none found of preferred, fallback to any tool
+        if not foundTool then
+            foundTool = backpack:FindFirstChildOfClass("Tool")
+        end
+        
+        if foundTool then
+            pcall(function()
+                humanoid:EquipTool(foundTool)
+            end)
+            return foundTool
+        end
+    end
+
+    return activeTool
+end
+
 -- ========================================================================================
 -- [10. BUILDING WINDUI TABS & TACKLING MODULES]
 -- ========================================================================================
@@ -686,50 +724,18 @@ HomeTab:Slider({
 })
 
 HomeTab:Toggle({
-    Title = "Toggle Fly Hack",
-    Desc = "Fly smoothly using camera directions.",
+    Title = "Noclip Fly Mode",
+    Desc = "Safely fly and navigate across the environment collision-free.",
     Value = false,
     Callback = function(state)
         ToggleFly(state)
     end
 })
 
-HomeTab:Slider({
-    Title = "Fly Flight Speed",
-    Desc = "Adjust standard fly velocity limit.",
-    Min = 16,
-    Max = 250,
-    Value = FlySpeed,
-    Callback = function(val)
-        FlySpeed = val
-    end
-})
-
-local InfJumpConnection
-HomeTab:Toggle({
-    Title = "Infinite Jump Protocol",
-    Desc = "Fly vertically in the sky dynamically.",
-    Value = false,
-    Callback = function(state)
-        if InfJumpConnection then InfJumpConnection:Disconnect(); InfJumpConnection = nil end
-        if state then
-            InfJumpConnection = UserInputService.JumpRequest:Connect(function()
-                pcall(function()
-                    local hrp = GetHRP()
-                    if hrp then
-                        hrp.Velocity = Vector3.new(hrp.Velocity.X, BaddieHubSettings.JumpPower, hrp.Velocity.Z)
-                    end
-                end)
-            end)
-            table.insert(Watchdog.Connections, InfJumpConnection)
-        end
-    end
-})
-
--- [Tab B: Universal ESP Visuals]
-local EspTab = CreateTab("Visuals (ESP)", "eye")
+-- [Tab B: ESP Hack Overlays]
+local EspTab = CreateTab("ESPs & Overlays", "eye")
 local EspEnabled = false
-local EspFolder = CoreGui:FindFirstChild("BaddieESPFolder") or Instance.new("Folder", CoreGui)
+local EspFolder = Instance.new("Folder", workspace)
 EspFolder.Name = "BaddieESPFolder"
 
 local function ApplyESP(player)
@@ -738,9 +744,11 @@ local function ApplyESP(player)
     local function HandleCharacter(char)
         task.wait(0.5)
         if not EspEnabled then return end
-        local hrp = char:WaitForChild("HumanoidRootPart", 10)
+        
+        local hrp = char:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
-
+        
+        -- Bounding Box Adornment
         local box = Instance.new("BoxHandleAdornment")
         box.Name = "BaddieESPBox"
         box.Size = Vector3.new(4, 6, 4)
@@ -749,33 +757,38 @@ local function ApplyESP(player)
         box.ZIndex = 5
         box.Adornee = hrp
         box.Parent = EspFolder
-
-        local tag = Instance.new("BillboardGui")
-        tag.Name = "BaddieESPTag"
-        tag.Size = UDim2.new(0, 200, 0, 50)
-        tag.Adornee = hrp
-        tag.AlwaysOnTop = true
-        tag.Parent = EspFolder
-
+        
+        -- Overhead Billboard Title
+        local billboard = Instance.new("BillboardGui")
+        billboard.Name = "BaddieESPTag"
+        billboard.Size = UDim2.new(0, 200, 0, 50)
+        billboard.AlwaysOnTop = true
+        billboard.Adornee = hrp
+        billboard.Parent = EspFolder
+        
         local text = Instance.new("TextLabel")
         text.Size = UDim2.new(1, 0, 1, 0)
         text.BackgroundTransparency = 1
-        text.TextColor3 = Color3.fromRGB(255, 255, 255)
+        text.TextColor3 = BaddieHubSettings.AccentColor
         text.TextStrokeTransparency = 0
-        text.Text = player.Name
+        text.Text = player.DisplayName .. " [" .. player.Name .. "]"
         text.Font = Enum.Font.GothamBold
-        text.TextSize = 11
-        text.Parent = tag
-
+        text.TextSize = 10
+        text.Parent = billboard
+        
+        -- Cleanup connections when dead/parent changes
         local distConn
         distConn = RunService.Heartbeat:Connect(function()
-            if EspEnabled and char and char:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                local dist = math.floor((char.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude)
-                text.Text = player.Name .. " [" .. dist .. "m]"
+            if EspEnabled and char and char.Parent and hrp and hrp.Parent then
+                local myHrp = GetHRP()
+                if myHrp then
+                    local d = math.floor((myHrp.Position - hrp.Position).Magnitude)
+                    text.Text = player.DisplayName .. " (" .. d .. " studs)"
+                end
             else
-                distConn:Disconnect()
+                if distConn then distConn:Disconnect() end
                 box:Destroy()
-                tag:Destroy()
+                billboard:Destroy()
             end
         end)
         table.insert(Watchdog.Connections, distConn)
@@ -955,6 +968,7 @@ EspTab:Toggle({
 -- [Tab C: Teleport Settings]
 local TeleportTab = CreateTab("Teleports", "map")
 local selectedPlayerTp = ""
+local targetPlayerInput = ""
 
 local function GetOtherPlayers()
     local list = {}
@@ -965,7 +979,17 @@ local function GetOtherPlayers()
     return list
 end
 
-TeleportTab:Dropdown({
+TeleportTab:TextBox({
+    Title = "Search Player Name",
+    Desc = "Type part of player name and press Enter.",
+    Value = "",
+    Callback = function(val)
+        targetPlayerInput = val
+    end
+})
+
+local PlayerDropdown
+PlayerDropdown = TeleportTab:Dropdown({
     Title = "Select Target Player",
     Desc = "Target player for smooth interpolation transport.",
     Value = "",
@@ -976,17 +1000,50 @@ TeleportTab:Dropdown({
 })
 
 TeleportTab:Button({
-    Title = "Safe TP to Player",
-    Desc = "Executes safe linear interpolation flight to selected player.",
+    Title = "Refresh Player List",
+    Desc = "Scan for active players in the server dynamically.",
     Callback = function()
-        if selectedPlayerTp ~= "" and selectedPlayerTp ~= "(no other players)" then
-            local targetPlayer = Players:FindFirstChild(selectedPlayerTp)
-            if targetPlayer and targetPlayer.Character then
-                local hrp = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    SafeTeleport(hrp.CFrame * CFrame.new(0, 3, 0))
+        local currentOpts = GetOtherPlayers()
+        if PlayerDropdown then
+            pcall(function() PlayerDropdown:Refresh(currentOpts, true) end)
+            pcall(function() PlayerDropdown:SetOptions(currentOpts) end)
+            pcall(function() PlayerDropdown:UpdateDropdown(currentOpts) end)
+        end
+    end
+})
+
+TeleportTab:Button({
+    Title = "Safe TP to Player",
+    Desc = "Executes safe linear interpolation flight to selected or searched player.",
+    Callback = function()
+        local targetName = selectedPlayerTp
+        if targetPlayerInput ~= "" then
+            targetName = targetPlayerInput
+        end
+        
+        local foundPlayer = nil
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then
+                if p.Name == targetName or p.DisplayName == targetName or p.Name:lower():find(targetName:lower()) or p.DisplayName:lower():find(targetName:lower()) then
+                    foundPlayer = p
+                    break
                 end
             end
+        end
+        
+        if foundPlayer and foundPlayer.Character then
+            local hrp = foundPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                SafeTeleport(hrp.CFrame * CFrame.new(0, 3, 0))
+            end
+        else
+            pcall(function()
+                WindUI:Notify({
+                    Title = "Teleport Failed",
+                    Content = "Target player not found or character not active.",
+                    Duration = 3
+                })
+            end)
         end
     end
 })
@@ -1002,6 +1059,27 @@ if BaddieHubSettings.EnableBloxFruits and (DetectedGame == "Blox Fruits" or Univ
     local FastAttack = false
 
     BloxTab:Section({ Title = "Main Farm Utilities" })
+
+    BloxTab:Dropdown({
+        Title = "Farming Weapon Preferred",
+        Desc = "Selects the weapon category to equip for level farming to prevent hotbar slot spam.",
+        Value = "Melee",
+        Options = {"Melee", "Sword", "Blox Fruit", "Any"},
+        Callback = function(val)
+            BaddieHubSettings.PreferredWeapon = val
+        end
+    })
+
+    BloxTab:Slider({
+        Title = "Farming Tween Speed",
+        Desc = "Adjust standard travel velocity studs/second limit.",
+        Min = 10,
+        Max = 200,
+        Value = BaddieHubSettings.FarmSpeed,
+        Callback = function(val)
+            BaddieHubSettings.FarmSpeed = val
+        end
+    })
 
     BloxTab:Toggle({
         Title = "Auto Farm Level",
@@ -1021,42 +1099,62 @@ if BaddieHubSettings.EnableBloxFruits and (DetectedGame == "Blox Fruits" or Univ
 
                         local questName, questId, mobName, questNpcCFrame, mobSpawnCFrame
                         
-                        -- Simple level calculation
+                        -- Premium Sea 1 Level to Quest mappings
                         if myLevel < 10 then
                             questName = "BanditQuest1"
                             questId = 1
                             mobName = "Bandit"
-                            questNpcCFrame = CFrame.new(1060, 16, 1500)
+                            questNpcCFrame = CFrame.new(1060, 16, 1546)
                             mobSpawnCFrame = CFrame.new(1145, 16, 1630)
                         elseif myLevel < 15 then
-                            questName = "MonkeyQuest1"
+                            questName = "FruitQuest"
                             questId = 1
                             mobName = "Monkey"
                             questNpcCFrame = CFrame.new(-1600, 37, 150)
                             mobSpawnCFrame = CFrame.new(-1620, 37, 230)
                         elseif myLevel < 30 then
-                            questName = "MonkeyQuest1"
+                            questName = "FruitQuest"
                             questId = 2
                             mobName = "Gorilla"
                             questNpcCFrame = CFrame.new(-1600, 37, 150)
                             mobSpawnCFrame = CFrame.new(-1200, 37, -200)
                         elseif myLevel < 60 then
-                            questName = "PirateQuest1"
+                            questName = "PirateQuest"
                             questId = 1
                             mobName = "Pirate"
                             questNpcCFrame = CFrame.new(-1136, 4, 3855)
                             mobSpawnCFrame = CFrame.new(-1200, 4, 3950)
-                        else
+                        elseif myLevel < 75 then
                             questName = "DesertQuest"
                             questId = 1
                             mobName = "Desert Bandit"
                             questNpcCFrame = CFrame.new(894, 6, 4385)
                             mobSpawnCFrame = CFrame.new(900, 6, 4450)
+                        elseif myLevel < 90 then
+                            questName = "DesertQuest"
+                            questId = 2
+                            mobName = "Desert Officer"
+                            questNpcCFrame = CFrame.new(894, 6, 4385)
+                            mobSpawnCFrame = CFrame.new(894, 15, 4385)
+                        elseif myLevel < 120 then
+                            questName = "SnowQuest"
+                            questId = 1
+                            mobName = "Snow Bandit"
+                            questNpcCFrame = CFrame.new(1386, 26, -1300)
+                            mobSpawnCFrame = CFrame.new(1389, 26, -1250)
+                        else
+                            -- Fallback/Default for high level First Sea
+                            questName = "SnowQuest"
+                            questId = 2
+                            mobName = "Snowman"
+                            questNpcCFrame = CFrame.new(1386, 26, -1300)
+                            mobSpawnCFrame = CFrame.new(1386, 26, -1350)
                         end
 
                         local hasQuest = false
                         pcall(function()
-                            local questGui = LocalPlayer.PlayerGui.Main.Quest
+                            local mainGui = LocalPlayer:FindFirstChild("PlayerGui") and LocalPlayer.PlayerGui:FindFirstChild("Main")
+                            local questGui = mainGui and mainGui:FindFirstChild("Quest")
                             if questGui and questGui.Visible then
                                 hasQuest = true
                             end
@@ -1064,7 +1162,7 @@ if BaddieHubSettings.EnableBloxFruits and (DetectedGame == "Blox Fruits" or Univ
 
                         if not hasQuest and questName then
                             SafeTeleport(questNpcCFrame)
-                            task.wait(0.8)
+                            task.wait(0.5)
                             pcall(function()
                                 ReplicatedStorage.Remotes.CommF:InvokeServer("StartQuest", questName, questId)
                             end)
@@ -1090,23 +1188,36 @@ if BaddieHubSettings.EnableBloxFruits and (DetectedGame == "Blox Fruits" or Univ
 
                             if targetMob and targetMob:FindFirstChild("HumanoidRootPart") then
                                 local hrp = targetMob.HumanoidRootPart
-                                SafeTeleport(hrp.CFrame * CFrame.new(0, 5, 0))
+                                SafeTeleport(hrp.CFrame * CFrame.new(0, 6, 0))
                                 
-                                local tool = GetPlayerTool()
-                                if tool and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-                                    LocalPlayer.Character.Humanoid:EquipTool(tool)
+                                pcall(function()
+                                    hrp.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, -3)
+                                    hrp.CanCollide = false
+                                    hrp.Velocity = Vector3.new(0,0,0)
+                                    if targetMob:FindFirstChild("Humanoid") then
+                                        targetMob.Humanoid.JumpPower = 0
+                                        targetMob.Humanoid.WalkSpeed = 0
+                                    end
+                                end)
+                                
+                                local tool = EquipPreferredWeapon()
+                                if tool then
                                     tool:Activate()
+                                    pcall(function()
+                                        local vu = game:GetService("VirtualUser")
+                                        vu:Button1Down(Vector2.new(0, 0), Camera.CFrame)
+                                        task.wait(0.01)
+                                        vu:Button1Up(Vector2.new(0, 0), Camera.CFrame)
+                                    end)
+                                    pcall(function()
+                                        ReplicatedStorage.Remotes.CommF:InvokeServer("Hit", 1)
+                                    end)
                                 end
-                                
-                                local vu = game:GetService("VirtualUser")
-                                vu:Button1Down(Vector2.new(0, 0), Camera.CFrame)
-                                task.wait(0.02)
-                                vu:Button1Up(Vector2.new(0, 0), Camera.CFrame)
                             else
                                 if mobSpawnCFrame then
                                     SafeTeleport(mobSpawnCFrame)
                                 end
-                                task.wait(0.8)
+                                task.wait(0.5)
                             end
                         end
                     end)
@@ -1125,9 +1236,8 @@ if BaddieHubSettings.EnableBloxFruits and (DetectedGame == "Blox Fruits" or Univ
             task.spawn(function()
                 while FastAttack do
                     pcall(function()
-                        local combat = GetPlayerTool()
-                        if combat and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-                            LocalPlayer.Character.Humanoid:EquipTool(combat)
+                        local combat = EquipPreferredWeapon()
+                        if combat then
                             combat:Activate()
                             pcall(function()
                                 ReplicatedStorage.Remotes.CommF:InvokeServer("Hit", 1)
@@ -1354,6 +1464,7 @@ if BaddieHubSettings.EnableWorldZero and (DetectedGame == "World Zero" or Univer
                     pcall(function()
                         local hrp = GetHRP()
                         if hrp then
+                            -- Scan for closest mob
                             local closestMob = nil
                             local minDist = 250
                             for _, char in ipairs(workspace:GetDescendants()) do
@@ -1371,10 +1482,12 @@ if BaddieHubSettings.EnableWorldZero and (DetectedGame == "World Zero" or Univer
                             end
 
                             if closestMob then
+                                -- Magnetize
                                 closestMob.CanCollide = false
                                 closestMob.CFrame = hrp.CFrame * CFrame.new(0, -3, -3)
                                 closestMob.Velocity = Vector3.new(0, 0, 0)
 
+                                -- Activate tools
                                 local char = LocalPlayer.Character
                                 if char then
                                     for _, tool in ipairs(char:GetChildren()) do
@@ -1382,6 +1495,7 @@ if BaddieHubSettings.EnableWorldZero and (DetectedGame == "World Zero" or Univer
                                     end
                                 end
 
+                                -- VirtualUser click
                                 local vu = game:GetService("VirtualUser")
                                 vu:Button1Down(Vector2.new(0, 0), Camera.CFrame)
                                 task.wait(0.01)
@@ -1421,13 +1535,68 @@ end
 -- =============================================================================
 local SettingsTab = CreateTab("Settings", "settings")
 
-SettingsTab:Button({
-    Title = "Full Cleanup & Destroy",
-    Desc = "Completely remove WindUI and BaddieHub scripts safely.",
-    Callback = function()
-        Watchdog:Cleanup()
-        CleanExistingHubs()
-        print("[BaddieHub] Safely unloaded multi-hub client.")
+SettingsTab:Section({ Title = "UI Options" })
+
+SettingsTab:Toggle({
+    Title = "Show Floating Toggle Button",
+    Desc = "Enables/disables the floating circular touch button on mobile.",
+    Value = BaddieHubSettings.ShowFloatingButton,
+    Callback = function(state)
+        BaddieHubSettings.ShowFloatingButton = state
+        if FloatingButtonInstance then
+            FloatingButtonInstance.Visible = state
+        end
+    end
+})
+
+SettingsTab:Slider({
+    Title = "Floating Button Size",
+    Desc = "Adjust size of the mobile floating toggle circular button.",
+    Min = 20,
+    Max = 120,
+    Value = BaddieHubSettings.ButtonSize,
+    Callback = function(val)
+        BaddieHubSettings.ButtonSize = val
+        if FloatingButtonInstance then
+            pcall(function()
+                FloatingButtonInstance.Size = UDim2.new(0, val, 0, val)
+                FloatingButtonInstance.TextSize = math.clamp(val / 4, 10, 20)
+            end)
+        end
+    end
+})
+
+SettingsTab:Dropdown({
+    Title = "UI Accent Theme",
+    Desc = "Changes the global WindUI look/theme style.",
+    Value = BaddieHubSettings.Theme,
+    Options = {"Dark", "Light", "Nord", "Aqua", "Rosepine", "Amethyst"},
+    Callback = function(val)
+        BaddieHubSettings.Theme = val
+        if WindUI and WindUI.SetTheme then
+            pcall(function() WindUI:SetTheme(val) end)
+        end
+    end
+})
+
+SettingsTab:Dropdown({
+    Title = "PC Toggle Keybind",
+    Desc = "Key to toggle open/close the GUI menu on PC keyboards.",
+    Value = BaddieHubSettings.ToggleKey,
+    Options = {"RightControl", "LeftControl", "RightShift", "LeftShift", "Insert", "Delete", "P", "Q", "Home"},
+    Callback = function(val)
+        BaddieHubSettings.ToggleKey = val
+    end
+})
+
+SettingsTab:Section({ Title = "Hack & Speed Configurations" })
+
+SettingsTab:Toggle({
+    Title = "Continuous Speed/Power Loop",
+    Desc = "Constantly forces WalkSpeed/JumpPower values, fixing reset on spawn.",
+    Value = BaddieHubSettings.ContinuousSpeed,
+    Callback = function(state)
+        BaddieHubSettings.ContinuousSpeed = state
     end
 })
 
@@ -1437,6 +1606,19 @@ SettingsTab:Toggle({
     Value = BaddieHubSettings.SafeMode,
     Callback = function(state)
         BaddieHubSettings.SafeMode = state
+    end
+})
+
+SettingsTab:Button({
+    Title = "Full Cleanup & Destroy",
+    Desc = "Completely remove WindUI and BaddieHub scripts safely.",
+    Callback = function()
+        Watchdog:Cleanup()
+        CleanExistingHubs()
+        if FloatingButtonGui then
+            pcall(function() FloatingButtonGui:Destroy() end)
+        end
+        print("[BaddieHub] Safely unloaded multi-hub client.")
     end
 })
 
