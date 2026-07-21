@@ -166,7 +166,7 @@ local function MkLabel(parent, pos, size, text, size2, font, color, alignX)
 end
 
 MkLabel(Card, UDim2.new(0,0,0,30), UDim2.new(1,0,0,30), "BADDIE404 MULTIHUB", 22, Enum.Font.GothamBold, BaddieHubSettings.AccentColor)
-MkLabel(Card, UDim2.new(0,0,0,65), UDim2.new(1,0,0,20), "Optimizing Environment Safety...", 12, Enum.Font.GothamMedium, Color3.fromRGB(180,180,190))
+local statusLabel = MkLabel(Card, UDim2.new(0,0,0,65), UDim2.new(1,0,0,20), "Optimizing Environment Safety...", 12, Enum.Font.GothamMedium, Color3.fromRGB(180,180,190))
 
 local BarBg = Instance.new("Frame", Card)
 BarBg.Position = UDim2.new(0.08,0,0.65,0)
@@ -186,7 +186,9 @@ local function SetProgress(p, d)
 end
 
 local function SetStatus(t)
-    Card:FindFirstChild("TextLabel").Text = t
+    if statusLabel then
+        statusLabel.Text = t
+    end
 end
 
 SetStatus("Scanning Network Safeguards..."); SetProgress(25, 0.3); task.wait(0.4)
