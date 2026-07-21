@@ -804,6 +804,154 @@ EspTab:Toggle({
     end
 })
 
+local ChestEspEnabled = false
+local FruitEspEnabled = false
+
+local function ApplyChestESP(chest)
+    if not ChestEspEnabled then return end
+    if not chest:IsA("BasePart") then return end
+    
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = "BaddieESPChest"
+    box.Size = chest.Size
+    box.Color3 = Color3.fromRGB(234, 179, 8) -- Gold
+    box.AlwaysOnTop = true
+    box.ZIndex = 4
+    box.Adornee = chest
+    box.Parent = EspFolder
+
+    local tag = Instance.new("BillboardGui")
+    tag.Name = "BaddieESPChestTag"
+    tag.Size = UDim2.new(0, 100, 0, 30)
+    tag.Adornee = chest
+    tag.AlwaysOnTop = true
+    tag.Parent = EspFolder
+
+    local text = Instance.new("TextLabel")
+    text.Size = UDim2.new(1, 0, 1, 0)
+    text.BackgroundTransparency = 1
+    text.TextColor3 = Color3.fromRGB(234, 179, 8)
+    text.TextStrokeTransparency = 0
+    text.Text = "Chest"
+    text.Font = Enum.Font.GothamBold
+    text.TextSize = 9
+    text.Parent = tag
+
+    local conn
+    conn = RunService.Heartbeat:Connect(function()
+        if ChestEspEnabled and chest and chest.Parent then
+            -- keep alive
+        else
+            if conn then conn:Disconnect() end
+            box:Destroy()
+            tag:Destroy()
+        end
+    end)
+    table.insert(Watchdog.Connections, conn)
+end
+
+local function ApplyFruitESP(fruit)
+    if not FruitEspEnabled then return end
+    local handle = fruit:FindFirstChild("Handle") or fruit:FindFirstChildOfClass("BasePart")
+    if not handle then return end
+
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = "BaddieESPFruit"
+    box.Size = handle.Size
+    box.Color3 = Color3.fromRGB(255, 64, 129) -- Crimson Pink
+    box.AlwaysOnTop = true
+    box.ZIndex = 6
+    box.Adornee = handle
+    box.Parent = EspFolder
+
+    local tag = Instance.new("BillboardGui")
+    tag.Name = "BaddieESPFruitTag"
+    tag.Size = UDim2.new(0, 150, 0, 35)
+    tag.Adornee = handle
+    tag.AlwaysOnTop = true
+    tag.Parent = EspFolder
+
+    local text = Instance.new("TextLabel")
+    text.Size = UDim2.new(1, 0, 1, 0)
+    text.BackgroundTransparency = 1
+    text.TextColor3 = Color3.fromRGB(255, 64, 129)
+    text.TextStrokeTransparency = 0
+    text.Text = "Fruit: " .. fruit.Name
+    text.Font = Enum.Font.GothamBold
+    text.TextSize = 10
+    text.Parent = tag
+
+    local conn
+    conn = RunService.Heartbeat:Connect(function()
+        if FruitEspEnabled and fruit and fruit.Parent then
+            -- keep alive
+        else
+            if conn then conn:Disconnect() end
+            box:Destroy()
+            tag:Destroy()
+        end
+    end)
+    table.insert(Watchdog.Connections, conn)
+end
+
+EspTab:Toggle({
+    Title = "Enable Chest ESP",
+    Desc = "Renders golden borders and indicators on all map chests.",
+    Value = false,
+    Callback = function(state)
+        ChestEspEnabled = state
+        if ChestEspEnabled then
+            for _, obj in ipairs(workspace:GetChildren()) do
+                if obj.Name:lower():find("chest") or obj.Name:lower():find("treasure") then
+                    ApplyChestESP(obj)
+                end
+            end
+            local addedConn = workspace.ChildAdded:Connect(function(obj)
+                task.wait(0.1)
+                if obj.Name:lower():find("chest") or obj.Name:lower():find("treasure") then
+                    ApplyChestESP(obj)
+                end
+            end)
+            table.insert(Watchdog.Connections, addedConn)
+        else
+            for _, o in ipairs(EspFolder:GetChildren()) do
+                if o.Name == "BaddieESPChest" or o.Name == "BaddieESPChestTag" then
+                    o:Destroy()
+                end
+            end
+        end
+    end
+})
+
+EspTab:Toggle({
+    Title = "Enable World Fruit ESP",
+    Desc = "Highlights any dropped Devil Fruits currently active in the server.",
+    Value = false,
+    Callback = function(state)
+        FruitEspEnabled = state
+        if FruitEspEnabled then
+            for _, o in ipairs(workspace:GetDescendants()) do
+                if o:IsA("Tool") and (o.Name:lower():find("fruit") or o.Name:lower():find("devil")) then
+                    ApplyFruitESP(o)
+                end
+            end
+            local addedConn = workspace.DescendantAdded:Connect(function(o)
+                task.wait(0.2)
+                if o:IsA("Tool") and (o.Name:lower():find("fruit") or o.Name:lower():find("devil")) then
+                    ApplyFruitESP(o)
+                end
+            end)
+            table.insert(Watchdog.Connections, addedConn)
+        else
+            for _, o in ipairs(EspFolder:GetChildren()) do
+                if o.Name == "BaddieESPFruit" or o.Name == "BaddieESPFruitTag" then
+                    o:Destroy()
+                end
+            end
+        end
+    end
+})
+
 -- [Tab C: Teleport Settings]
 local TeleportTab = CreateTab("Teleports", "map")
 local selectedPlayerTp = ""
@@ -849,6 +997,192 @@ TeleportTab:Button({
 if BaddieHubSettings.EnableBloxFruits and (DetectedGame == "Blox Fruits" or Universal) then
     local BloxTab = CreateTab("Blox Fruits", "sword")
     local ChestFarming = false
+    local AutoFarmLevel = false
+    local selectedStat = "None"
+    local FastAttack = false
+
+    BloxTab:Section({ Title = "Main Farm Utilities" })
+
+    BloxTab:Toggle({
+        Title = "Auto Farm Level",
+        Desc = "Automatically grabs quests, teleports to enemies, and defeats them smoothly.",
+        Value = false,
+        Callback = function(state)
+            AutoFarmLevel = state
+            task.spawn(function()
+                while AutoFarmLevel do
+                    pcall(function()
+                        local myLevel = 1
+                        pcall(function()
+                            if LocalPlayer:FindFirstChild("Data") and LocalPlayer.Data:FindFirstChild("Level") then
+                                myLevel = LocalPlayer.Data.Level.Value
+                            end
+                        end)
+
+                        local questName, questId, mobName, questNpcCFrame, mobSpawnCFrame
+                        
+                        -- Simple level calculation
+                        if myLevel < 10 then
+                            questName = "BanditQuest1"
+                            questId = 1
+                            mobName = "Bandit"
+                            questNpcCFrame = CFrame.new(1060, 16, 1500)
+                            mobSpawnCFrame = CFrame.new(1145, 16, 1630)
+                        elseif myLevel < 15 then
+                            questName = "MonkeyQuest1"
+                            questId = 1
+                            mobName = "Monkey"
+                            questNpcCFrame = CFrame.new(-1600, 37, 150)
+                            mobSpawnCFrame = CFrame.new(-1620, 37, 230)
+                        elseif myLevel < 30 then
+                            questName = "MonkeyQuest1"
+                            questId = 2
+                            mobName = "Gorilla"
+                            questNpcCFrame = CFrame.new(-1600, 37, 150)
+                            mobSpawnCFrame = CFrame.new(-1200, 37, -200)
+                        elseif myLevel < 60 then
+                            questName = "PirateQuest1"
+                            questId = 1
+                            mobName = "Pirate"
+                            questNpcCFrame = CFrame.new(-1136, 4, 3855)
+                            mobSpawnCFrame = CFrame.new(-1200, 4, 3950)
+                        else
+                            questName = "DesertQuest"
+                            questId = 1
+                            mobName = "Desert Bandit"
+                            questNpcCFrame = CFrame.new(894, 6, 4385)
+                            mobSpawnCFrame = CFrame.new(900, 6, 4450)
+                        end
+
+                        local hasQuest = false
+                        pcall(function()
+                            local questGui = LocalPlayer.PlayerGui.Main.Quest
+                            if questGui and questGui.Visible then
+                                hasQuest = true
+                            end
+                        end)
+
+                        if not hasQuest and questName then
+                            SafeTeleport(questNpcCFrame)
+                            task.wait(0.8)
+                            pcall(function()
+                                ReplicatedStorage.Remotes.CommF:InvokeServer("StartQuest", questName, questId)
+                            end)
+                            task.wait(0.5)
+                        else
+                            local targetMob = nil
+                            local searchFolder = workspace:FindFirstChild("Enemies") or workspace
+                            for _, v in ipairs(searchFolder:GetChildren()) do
+                                if v.Name == mobName and v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
+                                    targetMob = v
+                                    break
+                                end
+                            end
+
+                            if not targetMob then
+                                for _, v in ipairs(workspace:GetChildren()) do
+                                    if v:IsA("Model") and v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 and v.Name:lower():find(mobName:lower()) then
+                                        targetMob = v
+                                        break
+                                    end
+                                end
+                            end
+
+                            if targetMob and targetMob:FindFirstChild("HumanoidRootPart") then
+                                local hrp = targetMob.HumanoidRootPart
+                                SafeTeleport(hrp.CFrame * CFrame.new(0, 5, 0))
+                                
+                                local tool = GetPlayerTool()
+                                if tool and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+                                    LocalPlayer.Character.Humanoid:EquipTool(tool)
+                                    tool:Activate()
+                                end
+                                
+                                local vu = game:GetService("VirtualUser")
+                                vu:Button1Down(Vector2.new(0, 0), Camera.CFrame)
+                                task.wait(0.02)
+                                vu:Button1Up(Vector2.new(0, 0), Camera.CFrame)
+                            else
+                                if mobSpawnCFrame then
+                                    SafeTeleport(mobSpawnCFrame)
+                                end
+                                task.wait(0.8)
+                            end
+                        end
+                    end)
+                    task.wait(0.1)
+                end
+            end)
+        end
+    })
+
+    BloxTab:Toggle({
+        Title = "Rapid Fast Attack",
+        Desc = "Cancels standard animations to strike targets with extreme attack speeds.",
+        Value = false,
+        Callback = function(state)
+            FastAttack = state
+            task.spawn(function()
+                while FastAttack do
+                    pcall(function()
+                        local combat = GetPlayerTool()
+                        if combat and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+                            LocalPlayer.Character.Humanoid:EquipTool(combat)
+                            combat:Activate()
+                            pcall(function()
+                                ReplicatedStorage.Remotes.CommF:InvokeServer("Hit", 1)
+                            end)
+                        end
+                    end)
+                    task.wait(0.01)
+                end
+            end)
+        end
+    })
+
+    BloxTab:Dropdown({
+        Title = "Auto Stats Allocator",
+        Desc = "Automatically allocates level up points into chosen stat dynamically.",
+        Value = "None",
+        Options = {"None", "Melee", "Defense", "Sword", "Blox Fruit"},
+        Callback = function(v)
+            selectedStat = v
+        end
+    })
+
+    task.spawn(function()
+        while true do
+            if selectedStat ~= "None" then
+                pcall(function()
+                    local points = 0
+                    pcall(function()
+                        points = LocalPlayer.Data.Points.Value
+                    end)
+                    if points > 0 then
+                        local statName = selectedStat
+                        if selectedStat == "Blox Fruit" then
+                            statName = "Demon Fruit"
+                        end
+                        ReplicatedStorage.Remotes.CommF:InvokeServer("AddPoint", statName, 1)
+                    end
+                end)
+            end
+            task.wait(0.5)
+        end
+    end)
+
+    BloxTab:Button({
+        Title = "Buy Random Devil Fruit (Gacha)",
+        Desc = "Invokes Gacha Cousin dealer to purchase a random devil fruit instantly.",
+        Callback = function()
+            local success, result = pcall(function()
+                return ReplicatedStorage.Remotes.CommF:InvokeServer("Cousin", "Buy")
+            end)
+            if success then
+                print("[BaddieHub] Gacha result: " .. tostring(result))
+            end
+        end
+    })
     
     BloxTab:Toggle({
         Title = "Auto Farm Chests",
